@@ -68,7 +68,7 @@ if hasFs then
             makefolder("FruitsHub")
         end
         writefile(CachePath, scriptContent)
-        writefile(VerPath, "v1.0.5")
+        writefile(VerPath, "v1.0.6")
     end)
 end
 
