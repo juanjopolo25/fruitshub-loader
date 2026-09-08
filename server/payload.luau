@@ -2716,23 +2716,6 @@ local function serverHop()
         teleportError = nil
 
         setStatus(string.format("Server hop (#%d/%d): server %s/%d players (%s), hopping...", i, #candidates, count, MaxPlayers, tostring(srv.Region or "Global")))
-
-        -- Persistent queue_on_teleport for automatic execution in destination server
-        local qTeleport = (syn and syn.queue_on_teleport) or queue_on_teleport or (fluxus and fluxus.queue_on_teleport)
-        if qTeleport then
-            pcall(function()
-                local activeKey = tostring(getgenv().Key or getgenv().FruitsHubKey or "")
-                local activeWebhook = tostring(getgenv().Webhook or "")
-                local activeGateway = tostring(getgenv().FruitsHubGateway or "https://fruitshub.onrender.com")
-                qTeleport(string.format([[
-                    getgenv().Key = %q
-                    getgenv().Webhook = %q
-                    getgenv().FruitsHubGateway = %q
-                    loadstring(game:HttpGet(%q))()
-                ]], activeKey, activeWebhook, activeGateway, activeGateway .. "/loader"))
-            end)
-        end
-
         local okHop, resHop = pcall(function()
             return ServerBrowser:InvokeServer("teleport", cand.job)
         end)

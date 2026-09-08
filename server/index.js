@@ -746,16 +746,42 @@ app.get(["/", "/getkey"], async (req, res) => {
         }
     }
 
-    let remainingTimeStr = "24h";
-    const expiresVal = keyInfo ? (keyInfo.expires_at || keyInfo.expires) : null;
-    if (expiresVal) {
-        const diffMs = new Date(String(expiresVal)).getTime() - Date.now();
-        if (diffMs > 0) {
-            const hours = Math.floor(diffMs / (1000 * 60 * 60));
-            const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-            remainingTimeStr = `${hours}h ${minutes}m left`;
+    function formatRemainingTime(info) {
+        if (!info) return "24h left";
+        const tier = String(info.tier || "").toLowerCase();
+        if (tier === "permanent" || tier === "admin" || tier === "lifetime") {
+            return "Permanent / Lifetime";
         }
+
+        const expiresVal = info.expires_at || info.expires;
+        if (!expiresVal) return "24h left";
+
+        const diffMs = new Date(String(expiresVal)).getTime() - Date.now();
+        if (diffMs <= 0) return "Expired";
+
+        const totalSeconds = Math.floor(diffMs / 1000);
+        const days = Math.floor(totalSeconds / 86400);
+        const hours = Math.floor((totalSeconds % 86400) / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+
+        if (days > 365) {
+            return "Permanent / Lifetime";
+        }
+        if (days > 30) {
+            const months = Math.floor(days / 30);
+            const remDays = days % 30;
+            return remDays > 0 ? `${months}mo ${remDays}d left` : `${months}mo left`;
+        }
+        if (days > 0) {
+            return hours > 0 ? `${days}d ${hours}h left` : `${days}d left`;
+        }
+        if (hours > 0) {
+            return `${hours}h ${minutes}m left`;
+        }
+        return `${Math.max(1, minutes)}m left`;
     }
+
+    const remainingTimeStr = formatRemainingTime(keyInfo);
 
     const loaderCode = `getgenv().Key = "${activeKey || "PASTE_KEY_HERE"}"
 getgenv().Webhook = "YOUR_WEBHOOK" -- (Optional)
