@@ -1033,11 +1033,11 @@ function renderPortalHtml(activeKey, remainingTimeStr, loaderCode, hwidParam) {
       font-size: 0.85rem;
       color: var(--accent-cyan);
       margin-bottom: 20px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 14px;
       min-width: 0;
+      max-width: 100%;
+      word-break: break-all;
+      overflow-wrap: anywhere;
+      box-sizing: border-box;
     }
     .btn {
       display: inline-flex;
@@ -1147,8 +1147,8 @@ function renderPortalHtml(activeKey, remainingTimeStr, loaderCode, hwidParam) {
             <span class="info-label" style="margin-bottom: 0;">Your Key</span>
             <button class="btn btn-secondary" style="padding: 6px 14px; font-size: 0.78rem;" onclick="copyText('raw-key', this)">Copy Key</button>
           </div>
-          <div class="code-box" style="margin-bottom: 0; padding: 12px 16px;">
-            <span id="raw-key" style="font-weight: 600; color: var(--accent-cyan); font-size: 0.9rem; user-select: all;">${activeKey}</span>
+          <div class="code-box" style="margin-bottom: 0; padding: 14px 16px; display: block; word-break: break-all; overflow-wrap: anywhere;">
+            <span id="raw-key" style="font-weight: 600; color: var(--accent-cyan); font-size: 0.88rem; line-height: 1.6; word-break: break-all; overflow-wrap: anywhere; user-select: all; display: block;">${activeKey}</span>
           </div>
         </div>
 
