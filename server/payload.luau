@@ -4547,8 +4547,8 @@ local function buildStatusUI()
 
     local rightControls = Instance.new("Frame")
     rightControls.Name = "RightControls"
-    rightControls.Size = UDim2.new(0, 200, 1, 0)
-    rightControls.Position = UDim2.new(1, -200, 0, 0)
+    rightControls.Size = UDim2.new(0, 36, 1, 0)
+    rightControls.Position = UDim2.new(1, -36, 0, 0)
     rightControls.BackgroundTransparency = 1
     rightControls.ZIndex = 3
     rightControls.Parent = header
@@ -4560,72 +4560,15 @@ local function buildStatusUI()
     btnList.Padding = UDim.new(0, 5)
     btnList.Parent = rightControls
 
-    -- Status Pill Badge
-    local statusBadge = Instance.new("TextLabel")
-    statusBadge.Name = "StatusBadge"
-    statusBadge.Text = "● Online"
-    statusBadge.Font = Enum.Font.GothamBold
-    statusBadge.TextSize = 10
-    statusBadge.TextColor3 = Color3.fromRGB(255, 255, 255)
-    statusBadge.BackgroundColor3 = Color3.fromRGB(16, 185, 129)
-    statusBadge.BorderSizePixel = 0
-    statusBadge.ZIndex = 4
-    statusBadge.Size = UDim2.fromOffset(72, 22)
-    statusBadge.Parent = rightControls
-
-    local badgeCorner = Instance.new("UICorner")
-    badgeCorner.CornerRadius = UDim.new(0, 11)
-    badgeCorner.Parent = statusBadge
-
-    -- Toggle 3D Render Button
-    local btn3d = Instance.new("TextButton")
-    btn3d.Name = "Toggle3D"
-    btn3d.Size = UDim2.fromOffset(72, 22)
-    btn3d.Font = Enum.Font.GothamBold
-    btn3d.TextSize = 10
-    btn3d.BorderSizePixel = 0
-    btn3d.AutoButtonColor = true
-    btn3d.ZIndex = 4
-    btn3d.Parent = rightControls
-
-    local btn3dCorner = Instance.new("UICorner")
-    btn3dCorner.CornerRadius = UDim.new(0, 5)
-    btn3dCorner.Parent = btn3d
-
-    local btn3dStroke = Instance.new("UIStroke")
-    btn3dStroke.Thickness = 1
-    btn3dStroke.Parent = btn3d
-
-    local function refresh3dBtn()
-        if is3dEnabled then
-            btn3d.Text = "3D: ON"
-            btn3d.TextColor3 = Color3.fromRGB(34, 197, 94)
-            btn3d.BackgroundColor3 = Color3.fromRGB(20, 36, 26)
-            btn3dStroke.Color = Color3.fromRGB(34, 197, 94)
-        else
-            btn3d.Text = "3D: OFF"
-            btn3d.TextColor3 = Color3.fromRGB(239, 68, 68)
-            btn3d.BackgroundColor3 = Color3.fromRGB(38, 20, 24)
-            btn3dStroke.Color = Color3.fromRGB(239, 68, 68)
-        end
-    end
-    refresh3dBtn()
-
-    btn3d.MouseButton1Click:Connect(function()
-        is3dEnabled = not is3dEnabled
-        refresh3dBtn()
-        applyRenderState()
-    end)
-
-    -- Minimize Button
+    -- Minimize Button (Only header button)
     local btnMin = Instance.new("TextButton")
     btnMin.Name = "BtnMin"
     btnMin.Text = "—"
     btnMin.Font = Enum.Font.GothamBold
-    btnMin.TextSize = 11
+    btnMin.TextSize = 12
     btnMin.TextColor3 = Color3.fromRGB(203, 213, 225)
     btnMin.BackgroundColor3 = Color3.fromRGB(25, 31, 44)
-    btnMin.Size = UDim2.fromOffset(22, 22)
+    btnMin.Size = UDim2.fromOffset(26, 22)
     btnMin.BorderSizePixel = 0
     btnMin.ZIndex = 4
     btnMin.Parent = rightControls
@@ -4634,10 +4577,10 @@ local function buildStatusUI()
     minCorner.CornerRadius = UDim.new(0, 5)
     minCorner.Parent = btnMin
 
-    -- Floating Mini Bar (when minimized)
+    -- Floating Mini Bar (Shown when minimized with live status)
     local miniBar = Instance.new("Frame")
     miniBar.Name = "MiniBar"
-    miniBar.Size = UDim2.fromOffset(205, 30)
+    miniBar.Size = UDim2.fromOffset(360, 30)
     miniBar.Position = UDim2.new(0, 14, 1, -14)
     miniBar.AnchorPoint = Vector2.new(0, 1)
     miniBar.BackgroundColor3 = Color3.fromRGB(15, 18, 26)
@@ -4668,19 +4611,22 @@ local function buildStatusUI()
     miniLogo.Parent = miniBar
 
     local miniText = Instance.new("TextLabel")
-    miniText.Text = "FruitsHub · Active"
-    miniText.Font = Enum.Font.GothamBold
+    miniText.Name = "MiniStatus"
+    miniText.Text = (statusBaseMsg ~= "" and statusBaseMsg) or "FruitsHub Active"
+    miniText.Font = Enum.Font.GothamMedium
     miniText.TextSize = 10
     miniText.TextColor3 = Color3.fromRGB(241, 245, 249)
     miniText.BackgroundTransparency = 1
     miniText.ZIndex = 11
     miniText.Position = UDim2.new(0, 28, 0, 0)
-    miniText.Size = UDim2.new(0, 115, 1, 0)
+    miniText.Size = UDim2.new(1, -86, 1, 0)
     miniText.TextXAlignment = Enum.TextXAlignment.Left
+    miniText.TextTruncate = Enum.TextTruncate.AtEnd
     miniText.Parent = miniBar
 
     local miniExpand = Instance.new("TextButton")
-    miniExpand.Text = "Open"
+    miniExpand.Name = "BtnExpand"
+    miniExpand.Text = "Abrir"
     miniExpand.Font = Enum.Font.GothamBold
     miniExpand.TextSize = 10
     miniExpand.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -4695,15 +4641,21 @@ local function buildStatusUI()
     expCorner.CornerRadius = UDim.new(0, 4)
     expCorner.Parent = miniExpand
 
+    -- Minimize Action: Enables 3D rendering and shows mini bar
     btnMin.MouseButton1Click:Connect(function()
         shell.Visible = false
+        overlay.Visible = false
         miniBar.Visible = true
-        if is3dEnabled then overlay.BackgroundTransparency = 1 end
+        is3dEnabled = true
+        pcall(function() RunService:Set3dRenderingEnabled(true) end)
     end)
 
+    -- Maximize Action: Disables 3D rendering and shows full dashboard
     miniExpand.MouseButton1Click:Connect(function()
         miniBar.Visible = false
         shell.Visible = true
+        overlay.Visible = true
+        is3dEnabled = false
         applyRenderState()
     end)
 
@@ -4712,9 +4664,19 @@ local function buildStatusUI()
         pcall(function()
             UserInputService.InputBegan:Connect(function(input, gProcessed)
                 if not gProcessed and input.KeyCode == Enum.KeyCode.F1 then
-                    is3dEnabled = not is3dEnabled
-                    refresh3dBtn()
-                    applyRenderState()
+                    if shell.Visible then
+                        shell.Visible = false
+                        overlay.Visible = false
+                        miniBar.Visible = true
+                        is3dEnabled = true
+                        pcall(function() RunService:Set3dRenderingEnabled(true) end)
+                    else
+                        miniBar.Visible = false
+                        shell.Visible = true
+                        overlay.Visible = true
+                        is3dEnabled = false
+                        applyRenderState()
+                    end
                 end
             end)
         end)
@@ -5136,20 +5098,7 @@ local function buildStatusUI()
                 getSeaName(),
                 tostring((LP and LP.Team and LP.Team.Name) or Cfg.Team or "Marines"))
 
-            local st = tostring(Session.status_state or "normal")
-            if st == "storage_full" then
-                statusBadge.Text = "● Full"
-                statusBadge.BackgroundColor3 = Color3.fromRGB(249, 115, 22)
-            elseif st == "gacha_ready" then
-                statusBadge.Text = "● Gacha"
-                statusBadge.BackgroundColor3 = Color3.fromRGB(245, 158, 11)
-            elseif st == "error" then
-                statusBadge.Text = "● Error"
-                statusBadge.BackgroundColor3 = Color3.fromRGB(239, 68, 68)
-            else
-                statusBadge.Text = "● Online"
-                statusBadge.BackgroundColor3 = Color3.fromRGB(16, 185, 129)
-            end
+
 
             -- 2. Beli Card
             beliVal.Text = "$" .. formatBeli(curBeli)
@@ -5334,8 +5283,12 @@ local function buildStatusUI()
     end
 
     onStatusCallback = function(msg)
+        local statusMsg = tostring(msg or "")
         if statusText and statusText.Parent then
-            statusText.Text = tostring(msg or "")
+            statusText.Text = statusMsg
+        end
+        if miniText and miniText.Parent then
+            miniText.Text = statusMsg
         end
     end
 
