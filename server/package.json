@@ -1,0 +1,28 @@
+{
+  "name": "fruitshub-server",
+  "version": "1.0.0",
+  "description": "FruitsHub Universal Backend & Delivery Gateway for Render.com",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  },
+  "dependencies": {
+    "@libsql/client": "^0.14.0",
+    "compression": "^1.7.5",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "fruitshub",
+    "roblox",
+    "key-system"
+  ],
+  "author": "FruitsHub Team",
+  "license": "MIT"
+}

@@ -1,7 +1,6 @@
 --[[
     FruitsHub — Universal Execution Loader
-    CDN: GitHub Fastly + Smart Cache Engine
-    Portal: https://fruitshub.juanjopolo25.workers.dev/
+    Gateway: https://fruitshub.onrender.com
 ]]
 getgenv().FruitsHub = getgenv().FruitsHub or {}
 repeat task.wait() until game:IsLoaded() and game.Players.LocalPlayer
@@ -24,6 +23,7 @@ local function getClientHWID()
     return tostring(clientId ~= "" and clientId or "UNKNOWN_CLIENT")
 end
 
+local Gateway = getgenv().FruitsHubGateway or "https://fruitshub.onrender.com"
 local Key = tostring(getgenv().Key or getgenv().FruitsHubKey or ""):gsub("%s+", "")
 local HWID = getClientHWID()
 local CachePath = "FruitsHub/cache_v1.luau"
@@ -34,7 +34,8 @@ local localCached = hasFs and isfile(CachePath)
 local cachedVersion = (hasFs and isfile(VerPath)) and readfile(VerPath) or "none"
 
 local requestUrl = string.format(
-    "https://fruitshub.juanjopolo25.workers.dev/load?key=%s&hwid=%s&cv=%s",
+    "%s/load?key=%s&hwid=%s&cv=%s",
+    Gateway,
     Key,
     HWID,
     localCached and cachedVersion or "none"

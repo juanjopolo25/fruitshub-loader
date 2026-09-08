@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: fruitshub-server
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: ADMIN_SECRET
+        generateValue: false
+        value: FH_ADMIN_ROOT_SECRET_2026
+      - key: SIGNING_SECRET
+        generateValue: true
+      - key: MIN_WAIT_SECONDS
+        value: 20
+      - key: KEY_DURATION_HOURS
+        value: 24

@@ -1,0 +1,13 @@
+node_modules/
+server/node_modules/
+server/data/
+*.db
+*.db-journal
+.env
+server/.env
+.system_generated/
+*.log
+.wrangler/
+public/.wrangler/
+server/data/
+*.sqlite*
