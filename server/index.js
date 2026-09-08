@@ -22,16 +22,20 @@ const CONFIG = {
     KEY_DURATION_HOURS: parseInt(process.env.KEY_DURATION_HOURS || "24", 10),
 
     // Checkpoints (LootLabs / Linkvertise)
-    LOOTLABS_LINKS: [
-        "https://lootdest.org/s?EdniakIO",
-        "https://lootdest.org/s?U600KxJF",
-        "https://loot-link.com/s?zGYj3R28"
-    ],
-    LINKVERTISE_LINKS: [
-        "https://link-target.net/574428/A2fuRuJEclPX",
-        "https://link-hub.net/574428/DvFSlMdED1NU",
-        "https://link-hub.net/574428/yrlFgIJxxrV6"
-    ],
+    LOOTLABS_LINKS: process.env.LOOTLABS_LINKS
+        ? process.env.LOOTLABS_LINKS.split(",").map(s => s.trim())
+        : [
+            "https://lootdest.org/s?EdniakIO",
+            "https://lootdest.org/s?U600KxJF",
+            "https://loot-link.com/s?zGYj3R28"
+        ],
+    LINKVERTISE_LINKS: process.env.LINKVERTISE_LINKS
+        ? process.env.LINKVERTISE_LINKS.split(",").map(s => s.trim())
+        : [
+            "https://link-target.net/574428/A2fuRuJEclPX",
+            "https://link-hub.net/574428/DvFSlMdED1NU",
+            "https://link-hub.net/574428/yrlFgIJxxrV6"
+        ],
     LINKVERTISE_ANTI_BYPASS_TOKEN: process.env.LINKVERTISE_ANTI_BYPASS_TOKEN || "5626539749ba412c89d2205aeaba20de2db3d5b424ce54316cfcaeff5db171dd",
     LOOTLABS_API_TOKEN: process.env.LOOTLABS_API_TOKEN || "44428ecb0e20867a52d71095dba347fe128ad34dd7208a23f324ee237e7f2e76"
 };
@@ -595,21 +599,35 @@ app.get("/checkpoint/verify", async (req, res) => {
 });
 
 // 7. LootLabs Postback Webhook
-app.get("/api/lootlabs/postback", async (req, res) => {
-    const clickId = String(req.query.click_id || req.query.clickId || req.query.puid || req.query.CLICK_ID || "");
-    const ip = String(req.query.ip || req.query.IP || "");
-    const uniqueId = String(req.query.unique_id || req.query.uniqueId || req.query.UNIQUE_ID || "");
+app.all("/api/lootlabs/postback", async (req, res) => {
+    const params = { ...req.query, ...(req.body || {}) };
+    const puid = String(params.puid || params.PUID || "");
+    const clickId = String(params.click_id || params.clickId || params.CLICK_ID || "");
+    const ip = String(params.ip || params.IP || "");
+    const uniqueId = String(params.unique_id || params.uniqueId || params.UNIQUE_ID || "");
 
-    if (!clickId) {
-        return res.status(400).send("Missing click_id");
+    const targetId = puid || clickId;
+    if (!targetId) {
+        return res.status(400).send("Missing click_id or puid");
     }
 
     const receivedTimeSec = Math.floor(Date.now() / 1000);
+
+    // Save with primary identifier (puid matches our session.sid)
     await db.execute({
         sql: "INSERT OR REPLACE INTO conversions (click_id, ip, unique_id, received_at) VALUES (?, ?, ?, ?)",
-        args: [clickId, ip, uniqueId, receivedTimeSec]
+        args: [targetId, ip, uniqueId, receivedTimeSec]
     });
 
+    // If both puid and clickId are present, insert both to guarantee lookup match
+    if (clickId && clickId !== targetId) {
+        await db.execute({
+            sql: "INSERT OR REPLACE INTO conversions (click_id, ip, unique_id, received_at) VALUES (?, ?, ?, ?)",
+            args: [clickId, ip, uniqueId, receivedTimeSec]
+        });
+    }
+
+    console.log(`[+] LootLabs postback verified and recorded for: ${targetId}`);
     return res.status(200).send("OK");
 });
 
