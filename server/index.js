@@ -146,11 +146,11 @@ async function reloadScriptCache() {
             SCRIPT_CACHE.payload = String(payloadRow.rows[0].payload);
             console.log(`[i] Loaded active payload ${SCRIPT_CACHE.version} from DB (${SCRIPT_CACHE.payload.length} chars)`);
         } else {
-            // Fallback: Check local fruitshub.luau in parent directory if available
-            const localCandidate = path.join(__dirname, "..", "fruitshub.luau");
+            // Fallback: Check local payload.luau in server directory
+            const localCandidate = path.join(__dirname, "payload.luau");
             if (fs.existsSync(localCandidate)) {
                 SCRIPT_CACHE.payload = fs.readFileSync(localCandidate, "utf-8");
-                console.log(`[i] Seeded payload ${SCRIPT_CACHE.version} from local fruitshub.luau (${SCRIPT_CACHE.payload.length} chars)`);
+                console.log(`[i] Seeded payload ${SCRIPT_CACHE.version} from local payload.luau (${SCRIPT_CACHE.payload.length} chars)`);
                 // Persist into DB
                 await db.execute({
                     sql: "INSERT OR REPLACE INTO payloads (version, payload, updated_at) VALUES (?, ?, ?)",
