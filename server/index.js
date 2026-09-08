@@ -25,9 +25,9 @@ const CONFIG = {
     LOOTLABS_LINKS: process.env.LOOTLABS_LINKS
         ? process.env.LOOTLABS_LINKS.split(",").map(s => s.trim())
         : [
-            "https://lootdest.org/s?EdniakIO",
-            "https://lootdest.org/s?U600KxJF",
-            "https://loot-link.com/s?zGYj3R28"
+            "https://lootdest.org/s?0nuABVki",
+            "https://lootdest.org/s?dB7klGpP",
+            "https://lootdest.org/s?JEEbtzgW"
         ],
     LINKVERTISE_LINKS: process.env.LINKVERTISE_LINKS
         ? process.env.LINKVERTISE_LINKS.split(",").map(s => s.trim())
