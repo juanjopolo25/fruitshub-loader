@@ -25,9 +25,9 @@ const CONFIG = {
     LOOTLABS_LINKS: process.env.LOOTLABS_LINKS
         ? process.env.LOOTLABS_LINKS.split(",").map(s => s.trim())
         : [
-            "https://lootdest.org/s?0nuABVki",
-            "https://lootdest.org/s?dB7klGpP",
-            "https://lootdest.org/s?JEEbtzgW"
+            "https://lootdest.org/s?EdniakIO",
+            "https://lootdest.org/s?U600KxJF",
+            "https://loot-link.com/s?zGYj3R28"
         ],
     LINKVERTISE_LINKS: process.env.LINKVERTISE_LINKS
         ? process.env.LINKVERTISE_LINKS.split(",").map(s => s.trim())
@@ -113,7 +113,8 @@ async function initDatabase() {
     // Seed persistent keys so they always exist on cold start
     const SEED_KEYS = [
         { key: "FH-3ab8d70d6553eec6d98601f4", hwid: "bf72f6f4b9edb5b605cd2014f07a1d25f7f35e263471106639d79b41127dc303", tier: "24h", hours: 48 },
-        { key: "FH-3fdc72f8bbb5d38960e7bf35", hwid: "bf72f6f4b9edb5b605cd2014f07a1d25f7f35e263471106639d79b41127dc303", tier: "permanent", hours: 87600 }
+        { key: "FH-3fdc72f8bbb5d38960e7bf35", hwid: "bf72f6f4b9edb5b605cd2014f07a1d25f7f35e263471106639d79b41127dc303", tier: "permanent", hours: 87600 },
+        { key: "FH-N2IzODMyNDIzNDM4NDEzNDQxMmQ0NjQxMzQzMjJkMzQzMzQxMzAyZDQyNDEzNDQ2MmQ0NDQ0NDQzNzQzNDYzMzMyMzgzMzQ2MzM3ZDoxNzg5MDU5NjkwMDE1OjI0aDo4Yzg0OTg.d704356136083072", hwid: "7b38324234384134412d464134322d343341302d424134462d4444443743463332383346337d", tier: "24h", hours: 48 }
     ];
     for (const sk of SEED_KEYS) {
         const expIso = new Date(Date.now() + sk.hours * 3600 * 1000).toISOString();
