@@ -110,6 +110,19 @@ async function initDatabase() {
         );
     `);
 
+    // Seed persistent keys so they always exist on cold start
+    const SEED_KEYS = [
+        { key: "FH-3ab8d70d6553eec6d98601f4", hwid: "bf72f6f4b9edb5b605cd2014f07a1d25f7f35e263471106639d79b41127dc303", tier: "24h", hours: 48 },
+        { key: "FH-3fdc72f8bbb5d38960e7bf35", hwid: "bf72f6f4b9edb5b605cd2014f07a1d25f7f35e263471106639d79b41127dc303", tier: "permanent", hours: 87600 }
+    ];
+    for (const sk of SEED_KEYS) {
+        const expIso = new Date(Date.now() + sk.hours * 3600 * 1000).toISOString();
+        await db.execute({
+            sql: "INSERT OR IGNORE INTO keys (key, hwid, created_at, expires_at, active, tier, provider) VALUES (?, ?, ?, ?, 1, ?, 'seed')",
+            args: [sk.key, sk.hwid, new Date().toISOString(), expIso, sk.tier]
+        });
+    }
+
     console.log(`[+] Database initialized successfully (${dbUrl})`);
 }
 
@@ -185,6 +198,39 @@ function verifyAndDecodeData(signedToken, secret) {
             return null;
         }
         return JSON.parse(dataStr);
+    } catch {
+        return null;
+    }
+}
+
+function generateSignedKey(hwid, expiresMs, tier = "24h") {
+    const rawHwid = (hwid && hwid !== "DEFAULT_USER" && hwid !== "UNSET" && !hwid.startsWith("WEB_")) ? hwid : "UNBOUND";
+    const nonce = crypto.randomBytes(3).toString("hex");
+    const payloadStr = `${rawHwid}:${expiresMs}:${tier}:${nonce}`;
+    const payloadB64 = Buffer.from(payloadStr, "utf-8").toString("base64url");
+    const sig = crypto.createHmac("sha256", CONFIG.SIGNING_SECRET).update(payloadStr).digest("hex").substring(0, 16);
+    return `FH-${payloadB64}.${sig}`;
+}
+
+function decodeAndVerifyKey(keyStr, secret) {
+    if (!keyStr || typeof keyStr !== "string" || !keyStr.startsWith("FH-") || !keyStr.includes(".")) return null;
+    const tokenPart = keyStr.substring(3);
+    const dotIdx = tokenPart.indexOf(".");
+    if (dotIdx === -1) return null;
+    const payloadB64 = tokenPart.substring(0, dotIdx);
+    const signatureHex = tokenPart.substring(dotIdx + 1);
+    try {
+        const payloadStr = Buffer.from(payloadB64, "base64url").toString("utf-8");
+        const expectedSig = crypto.createHmac("sha256", secret).update(payloadStr).digest("hex").substring(0, 16);
+        if (signatureHex.length !== expectedSig.length || !crypto.timingSafeEqual(Buffer.from(signatureHex, "hex"), Buffer.from(expectedSig, "hex"))) {
+            return null;
+        }
+        const parts = payloadStr.split(":");
+        if (parts.length < 3) return null;
+        const [boundHwid, expiresMsStr, tier] = parts;
+        const expiresMs = Number(expiresMsStr);
+        if (isNaN(expiresMs) || expiresMs < Date.now()) return null;
+        return { valid: true, hwid: boundHwid, expires_at: new Date(expiresMs).toISOString(), tier: tier || "24h" };
     } catch {
         return null;
     }
@@ -356,16 +402,38 @@ app.get(["/load", "/load.luau"], async (req, res) => {
 
     // Query key in Database
     try {
+        let keyRow = null;
         const keyResult = await db.execute({
             sql: "SELECT * FROM keys WHERE key = ?",
             args: [key]
         });
 
-        if (keyResult.rows.length === 0) {
-            return res.status(200).send(generateKickResponse("FruitsHub: Invalid key. Key link has been copied to your clipboard to generate a new one.", keyUrl));
+        if (keyResult.rows.length > 0) {
+            keyRow = keyResult.rows[0];
+        } else {
+            // Self-healing fallback: verify cryptographic signature of key
+            const verified = decodeAndVerifyKey(key, CONFIG.SIGNING_SECRET);
+            if (verified && verified.valid) {
+                const nowIso = new Date().toISOString();
+                const keyHwid = (hwid && hwid !== "UNKNOWN_CLIENT") ? hwid : (verified.hwid || "UNBOUND");
+                await db.execute({
+                    sql: "INSERT OR REPLACE INTO keys (key, hwid, created_at, expires_at, active, tier, provider) VALUES (?, ?, ?, ?, 1, ?, 'self_heal')",
+                    args: [key, keyHwid, nowIso, verified.expires_at, verified.tier || "24h"]
+                });
+                keyRow = {
+                    key: key,
+                    hwid: keyHwid,
+                    active: 1,
+                    expires_at: verified.expires_at,
+                    tier: verified.tier || "24h"
+                };
+                console.log(`[+] Self-healed and restored cryptographic key into DB: ${key}`);
+            }
         }
 
-        const keyRow = keyResult.rows[0];
+        if (!keyRow) {
+            return res.status(200).send(generateKickResponse("FruitsHub: Invalid key. Key link has been copied to your clipboard to generate a new one.", keyUrl));
+        }
 
         if (!keyRow.active) {
             return res.status(200).send(generateKickResponse("FruitsHub: This key has been deactivated or blacklisted."));
@@ -581,11 +649,11 @@ app.get("/checkpoint/verify", async (req, res) => {
         return res.send(renderNextStepTransition(session.hwid, session.provider, nextStep));
     }
 
-    // Generate 24h key
-    const newKey = generateSecureKey();
+    // Generate 24h self-healing signed key
     const expiresDate = new Date(Date.now() + CONFIG.KEY_DURATION_HOURS * 3600 * 1000);
     const isGenericHwid = !session.hwid || session.hwid === "DEFAULT_USER" || session.hwid === "UNSET" || session.hwid === "UNBOUND" || session.hwid.startsWith("WEB_");
     const finalHwid = isGenericHwid ? "UNBOUND" : session.hwid;
+    const newKey = generateSignedKey(finalHwid, expiresDate.getTime(), "24h");
     const nowIso = new Date().toISOString();
     const expiresIso = expiresDate.toISOString();
 
@@ -641,11 +709,12 @@ app.post("/admin/key", async (req, res) => {
     const { action, key, hwid, hours, maintenance } = req.body;
 
     if (action === "create_key") {
-        const createdKey = key || generateSecureKey();
         const duration = hours || 24;
         const nowIso = new Date().toISOString();
-        const expiresIso = new Date(Date.now() + duration * 3600 * 1000).toISOString();
+        const expiresMs = Date.now() + duration * 3600 * 1000;
+        const expiresIso = new Date(expiresMs).toISOString();
         const finalHwid = hwid || "UNSET";
+        const createdKey = key || generateSignedKey(finalHwid, expiresMs, "admin");
 
         await db.execute({
             sql: "INSERT OR REPLACE INTO keys (key, hwid, created_at, expires_at, active, tier, provider) VALUES (?, ?, ?, ?, 1, 'admin', 'admin')",
@@ -743,6 +812,30 @@ app.get(["/", "/getkey"], async (req, res) => {
         });
         if (rowRes.rows.length > 0) {
             keyInfo = rowRes.rows[0];
+        } else {
+            // Self-healing check for stateless signed key
+            const verified = decodeAndVerifyKey(activeKey, CONFIG.SIGNING_SECRET);
+            if (verified && !verified.isExpired) {
+                const nowIsoStr = new Date().toISOString();
+                const expIsoStr = new Date(verified.expiresMs).toISOString();
+                try {
+                    await db.execute({
+                        sql: "INSERT OR REPLACE INTO keys (key, hwid, created_at, expires_at, active, tier, provider) VALUES (?, ?, ?, ?, 1, ?, 'checkpoint_restore')",
+                        args: [activeKey, verified.hwid, nowIsoStr, expIsoStr, verified.tier]
+                    });
+                    keyInfo = {
+                        key: activeKey,
+                        hwid: verified.hwid,
+                        created_at: nowIsoStr,
+                        expires_at: expIsoStr,
+                        active: 1,
+                        tier: verified.tier,
+                        provider: 'checkpoint_restore'
+                    };
+                } catch (e) {
+                    console.error("[-] Failed to restore signed key in portal:", e);
+                }
+            }
         }
     }
 
