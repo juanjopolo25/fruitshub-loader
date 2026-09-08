@@ -230,7 +230,7 @@ function decodeAndVerifyKey(keyStr, secret) {
         const [boundHwid, expiresMsStr, tier] = parts;
         const expiresMs = Number(expiresMsStr);
         if (isNaN(expiresMs) || expiresMs < Date.now()) return null;
-        return { valid: true, hwid: boundHwid, expires_at: new Date(expiresMs).toISOString(), tier: tier || "24h" };
+        return { valid: true, hwid: boundHwid, expires_at: new Date(expiresMs).toISOString(), expiresMs: expiresMs, tier: tier || "24h" };
     } catch {
         return null;
     }
@@ -815,9 +815,9 @@ app.get(["/", "/getkey"], async (req, res) => {
         } else {
             // Self-healing check for stateless signed key
             const verified = decodeAndVerifyKey(activeKey, CONFIG.SIGNING_SECRET);
-            if (verified && !verified.isExpired) {
+            if (verified && verified.valid) {
                 const nowIsoStr = new Date().toISOString();
-                const expIsoStr = new Date(verified.expiresMs).toISOString();
+                const expIsoStr = verified.expires_at;
                 try {
                     await db.execute({
                         sql: "INSERT OR REPLACE INTO keys (key, hwid, created_at, expires_at, active, tier, provider) VALUES (?, ?, ?, ?, 1, ?, 'checkpoint_restore')",
