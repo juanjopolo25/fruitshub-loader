@@ -261,7 +261,11 @@ const app = express();
 
 // Middleware: Enable Gzip compression (reduces payload from ~213KB to ~45KB, saving 78% bandwidth)
 app.use(compression());
-app.use(cors());
+app.use(cors({
+    origin: "*",
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-FruitsHub-Key", "Cache-Control"]
+}));
 app.use(express.json({ limit: "15mb" }));
 app.use(express.urlencoded({ extended: true, limit: "15mb" }));
 
@@ -785,6 +789,154 @@ app.post("/api/deploy", async (req, res) => {
         console.error("[-] Deployment error:", err);
         return res.status(500).json({ error: err.message });
     }
+});
+
+// ==================== IN-MEMORY TELEMETRY HUB ====================
+// Map<key, Map<accountName, accountData>>
+const activeTelemetries = new Map();
+
+// Helper to validate a user key against DB or cryptographic HMAC
+async function validateUserKey(keyStr) {
+    if (!keyStr || typeof keyStr !== "string") return null;
+    const cleanKey = keyStr.trim();
+    if (!cleanKey.startsWith("FH-")) return null;
+
+    try {
+        const rowRes = await db.execute({
+            sql: "SELECT * FROM keys WHERE key = ? AND active = 1",
+            args: [cleanKey]
+        });
+
+        if (rowRes.rows.length > 0) {
+            const keyRow = rowRes.rows[0];
+            const exp = keyRow.expires_at ? new Date(String(keyRow.expires_at)).getTime() : 0;
+            if (exp > 0 && exp < Date.now()) return null; // Expired
+            return {
+                key: cleanKey,
+                tier: keyRow.tier || "24h",
+                expires_at: keyRow.expires_at,
+                valid: true
+            };
+        }
+
+        // Cryptographic fallback self-heal
+        const verified = decodeAndVerifyKey(cleanKey, CONFIG.SIGNING_SECRET);
+        if (verified && verified.valid) {
+            return {
+                key: cleanKey,
+                tier: verified.tier || "24h",
+                expires_at: verified.expires_at,
+                valid: true
+            };
+        }
+    } catch (e) {
+        console.error("[-] Error validating user key:", e);
+    }
+    return null;
+}
+
+// 9.1 Ingest Telemetry Heartbeat from Roblox Executor
+app.post("/api/telemetry", async (req, res) => {
+    const key = req.headers["x-fruitshub-key"] || req.body.key;
+    if (!key) {
+        return res.status(401).json({ error: "Missing FruitsHub access key" });
+    }
+
+    const keyValidation = await validateUserKey(String(key));
+    if (!keyValidation) {
+        return res.status(401).json({ error: "Invalid or expired FruitsHub key" });
+    }
+
+    const accountName = String(req.body.account || req.body.accountName || "Unknown Account").trim();
+    if (!accountName) {
+        return res.status(400).json({ error: "Missing account identifier" });
+    }
+
+    const now = Date.now();
+    const data = req.body.telemetry || req.body;
+
+    if (!activeTelemetries.has(keyValidation.key)) {
+        activeTelemetries.set(keyValidation.key, new Map());
+    }
+
+    const accountMap = activeTelemetries.get(keyValidation.key);
+    const existing = accountMap.get(accountName) || {};
+
+    const accountData = {
+        account: accountName,
+        userId: data.userId || existing.userId || 0,
+        avatarUrl: data.avatarUrl || existing.avatarUrl || "https://cdn.discordapp.com/embed/avatars/0.png",
+        level: Number(data.level || existing.level || 0),
+        beli: Number(data.beli || existing.beli || 0),
+        beliDiff: Number(data.beliDiff || 0),
+        team: String(data.team || existing.team || "Marines"),
+        sea: String(data.sea || existing.sea || "First Sea"),
+        status: String(data.status || "online"), // "online", "storage_full", "gacha_ready", "error"
+        lastAction: String(data.lastAction || existing.lastAction || "Autonomous Farming"),
+        serverHops: Number(data.serverHops || existing.serverHops || 0),
+        jobId: String(data.jobId || existing.jobId || ""),
+        gachaText: String(data.gachaText || "Available"),
+        gachaCooldownEnd: Number(data.gachaCooldownEnd || 0),
+        storage: data.storage || existing.storage || { counts: { Mythical: {}, Legendary: {}, Rare: {}, Common: {} }, totalCount: 0, maxCap: 1 },
+        sessionStats: data.sessionStats || existing.sessionStats || { uptime: "0m", server_hops: 0, quests: 0, fruitsStoredToday: 0, gachaRolls: 0, lastSavedFruit: "None" },
+        recentDrops: data.recentDrops || existing.recentDrops || [],
+        lastSeen: now
+    };
+
+    accountMap.set(accountName, accountData);
+
+    return res.status(200).json({ success: true, timestamp: now });
+});
+
+// 9.2 Real-time Telemetry Query Endpoint for Web Dashboard
+app.get("/api/user/telemetry", async (req, res) => {
+    const key = req.headers["x-fruitshub-key"] || req.query.key;
+    if (!key) {
+        return res.status(401).json({ error: "No key provided" });
+    }
+
+    const keyValidation = await validateUserKey(String(key));
+    if (!keyValidation) {
+        return res.status(401).json({ error: "Invalid or expired key" });
+    }
+
+    const now = Date.now();
+    const accountMap = activeTelemetries.get(keyValidation.key);
+    const accounts = [];
+
+    if (accountMap) {
+        for (const [accountName, accData] of accountMap.entries()) {
+            const ageMs = now - accData.lastSeen;
+            // If stale for more than 24 hours, prune
+            if (ageMs > 24 * 3600 * 1000) {
+                accountMap.delete(accountName);
+                continue;
+            }
+
+            const item = { ...accData };
+            // If no heartbeat received in >45 seconds, mark as offline
+            if (ageMs > 45000) {
+                item.status = "offline";
+            }
+            item.ageSeconds = Math.floor(ageMs / 1000);
+            accounts.push(item);
+        }
+    }
+
+    accounts.sort((a, b) => a.account.localeCompare(b.account));
+
+    return res.status(200).json({
+        success: true,
+        keyInfo: {
+            key: keyValidation.key,
+            tier: keyValidation.tier,
+            expires_at: keyValidation.expires_at,
+            activeAccounts: accounts.filter(a => a.status !== "offline").length,
+            totalAccounts: accounts.length
+        },
+        accounts,
+        serverTime: now
+    });
 });
 
 // 10. Clean Dark Mode Key System Portal

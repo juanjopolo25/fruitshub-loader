@@ -40,7 +40,7 @@ local CollectionService = game:GetService("CollectionService")
 local LP = Players.LocalPlayer
 local CommF_ = ReplicatedStorage:WaitForChild("Remotes", 30):WaitForChild("CommF_", 30)
 local ServerBrowser = ReplicatedStorage:FindFirstChild("__ServerBrowser")
-local MagnetEvent = nil -- [TEMPORARY: MAGNET EVENT FORWARD DECLARATION - ELIMINAR EN 15 DÍAS]
+local MagnetEvent = nil -- [TEMPORARY: MAGNET EVENT FORWARD DECLARATION - REMOVE IN 15 DAYS]
 local AutoQuestFarm = nil -- Auto Quest & Beli Farming forward declaration
 local stopTween = nil
 local stopQuestTween = nil
@@ -644,7 +644,7 @@ local function loadAccountSession()
                 Session.gacha_rolls = data.gacha_rolls or 0
                 Session.recent_fruits = data.recent_fruits or {}
                 for _, rf in ipairs(Session.recent_fruits) do
-                    if rf.source and tostring(rf.source):lower() == "suelo" then
+                    if rf.source and (tostring(rf.source):lower() == "suelo" or tostring(rf.source):lower() == "ground") then
                         rf.source = "Ground"
                     end
                     if rf.name then
@@ -821,7 +821,7 @@ local function buildDashboardPayload()
         end
     end
 
-    -- [TEMPORARY: MAGNET EVENT GACHA WEBHOOK - ELIMINAR EN 15 DÍAS]
+    -- [TEMPORARY: MAGNET EVENT GACHA WEBHOOK - REMOVE IN 15 DAYS]
     local gachaFieldName = "⏳ Gacha Roll"
     if Cfg.MagnetGacha and MagnetEvent and MagnetEvent.getTokenBalance then
         local magTokens = MagnetEvent.getTokenBalance()
@@ -889,7 +889,7 @@ local function buildDashboardPayload()
         local lf = Session.recent_fruits[#Session.recent_fruits]
         local lfName = tostring(lf.name or "Fruit"):gsub("%s*%b()", ""):gsub("^%s+", ""):gsub("%s+$", "")
         local lfSrc = tostring(lf.source or "Ground")
-        if lfSrc:lower() == "suelo" then lfSrc = "Ground" end
+        if lfSrc:lower() == "suelo" or lfSrc:lower() == "ground" then lfSrc = "Ground" end
         lastSavedStr = "**" .. lfName .. "** (<t:" .. lf.time .. ":R> • " .. lfSrc .. ")"
     end
 
@@ -932,9 +932,138 @@ local function buildDashboardPayload()
     }
 end
 
--- Dashboard synchronization (POST ?wait=true or PATCH)
+
+-- ===================== FruitsHub Universal Telemetry Service =====================
+local TelemetryService = {}
+local lastBackendSync = 0
+local backendDebounceSecs = 10
+
+local function buildStructuredTelemetry()
+    local curBeli, curLevel = getPlayerData()
+    local beliDiff = curBeli - Session.initial_beli
+    local avatarUrl = getAvatarUrl()
+    local maxCap = getMaxFruitCap()
+
+    local counts = {
+        Mythical = {},
+        Legendary = {},
+        Rare = {},
+        Common = {},
+    }
+    local totalCount = 0
+
+    for fruitKey, storedVal in pairs(Cfg.StoredFruits) do
+        local qty = (type(storedVal) == "number" and storedVal) or 1
+        local fInfo = getFruitInfo(fruitKey)
+        local r = fInfo.rarity or "Common"
+        local cat = "Common"
+        if r == "Mythical" then cat = "Mythical"
+        elseif r == "Legendary" then cat = "Legendary"
+        elseif r == "Rare" then cat = "Rare"
+        end
+
+        local cName = (fInfo.name and fInfo.name ~= "" and fInfo.name) or fruitKey
+        counts[cat][cName] = (counts[cat][cName] or 0) + qty
+        totalCount = totalCount + qty
+    end
+
+    local gachaText = "Available"
+    local now = os.time()
+    if AutoQuestFarm and AutoQuestFarm.needsFarming and AutoQuestFarm.needsFarming() then
+        if curLevel < 50 then
+            gachaText = string.format("AutoQuest Level (%d/50)", curLevel)
+        else
+            local targetCost = (Session.gacha_cost and Session.gacha_cost > 0 and Session.gacha_cost) or (AutoQuestFarm.getGachaPrice and AutoQuestFarm.getGachaPrice()) or 0
+            gachaText = string.format("AutoQuest Beli ($%s / $%s)", formatBeli(curBeli), formatBeli(targetCost))
+        end
+    elseif Session.gacha_cooldown_end > now then
+        gachaText = string.format("%ds cooldown", Session.gacha_cooldown_end - now)
+    elseif Session.gacha_no_beli then
+        gachaText = "Out of Beli"
+    end
+
+    local uptimeStr = formatDuration(os.time() - Session.session_start)
+    local lastSavedStr = "None yet"
+    if #Session.recent_fruits > 0 then
+        local lf = Session.recent_fruits[#Session.recent_fruits]
+        local lfName = tostring(lf.name or "Fruit"):gsub("%s*%b()", ""):gsub("^%s+", ""):gsub("%s+$", "")
+        local lfSrc = tostring(lf.source or "Ground")
+        if lfSrc:lower() == "suelo" or lfSrc:lower() == "ground" then lfSrc = "Ground" end
+        lastSavedStr = lfName .. " (" .. lfSrc .. ")"
+    end
+
+    return {
+        account = LP.Name,
+        userId = LP.UserId,
+        avatarUrl = avatarUrl,
+        level = curLevel,
+        beli = curBeli,
+        beliDiff = beliDiff,
+        team = tostring(LP.Team and LP.Team.Name or "Marines"),
+        sea = getSeaName(),
+        status = Session.status_state or "online",
+        lastAction = Session.last_action or "Autonomous Farming",
+        serverHops = Session.server_hops or 0,
+        jobId = string.sub(tostring(game.JobId), 1, 8),
+        gachaText = gachaText,
+        gachaCooldownEnd = Session.gacha_cooldown_end or 0,
+        storage = {
+            counts = counts,
+            totalCount = totalCount,
+            maxCap = maxCap
+        },
+        sessionStats = {
+            uptime = uptimeStr,
+            server_hops = Session.server_hops or 0,
+            quests = Session.quest_completed or 0,
+            fruitsStoredToday = Session.fruits_stored or 0,
+            gachaRolls = Session.gacha_rolls or 0,
+            lastSavedFruit = lastSavedStr
+        },
+        recentDrops = Session.recent_fruits or {}
+    }
+end
+
+function TelemetryService.syncBackend(force)
+    local userKey = getgenv().Key
+    if not userKey or tostring(userKey) == "" or tostring(userKey) == "PASTE_KEY_HERE" then
+        return
+    end
+    if not httpRequest then return end
+
+    local now = os.clock()
+    if not force and (now - lastBackendSync) < backendDebounceSecs then
+        return
+    end
+    lastBackendSync = now
+
+    task.spawn(function()
+        local backendUrl = getgenv().BackendUrl or "https://fruitshub.onrender.com"
+        local telemetryData = buildStructuredTelemetry()
+        local reqBody = HttpService:JSONEncode({
+            key = tostring(userKey),
+            account = LP.Name,
+            telemetry = telemetryData
+        })
+
+        pcall(function()
+            httpRequest({
+                Url = backendUrl .. "/api/telemetry",
+                Method = "POST",
+                Headers = {
+                    ["Content-Type"] = "application/json",
+                    ["X-FruitsHub-Key"] = tostring(userKey)
+                },
+                Body = reqBody
+            })
+        end)
+    end)
+end
+
+-- Dashboard synchronization (Roblox UI, Web Dashboard API, and Discord Webhook)
 function DiscordDashboard.sync(force)
     pcall(updateDashboardUI)
+    pcall(function() TelemetryService.syncBackend(force) end)
     if not httpRequest or not Config.dashboard_webhook or Config.dashboard_webhook == "" then
         return
     end
@@ -1222,7 +1351,7 @@ DiscordAlerts.rolled = function(fruitTarget, boxName)
     Session.gacha_rolls = Session.gacha_rolls + 1
     Session.status_state = "normal"
 
-    -- [TEMPORARY: MAGNET EVENT GACHA ALERT - ELIMINAR EN 15 DÍAS]
+    -- [TEMPORARY: MAGNET EVENT GACHA ALERT - REMOVE IN 15 DAYS]
     local isMagnet = (boxName == "MagnetEventGacha26")
     local rollTitle = isMagnet and "⚡ Magnet Gacha: " or ("Gacha Roll (" .. tostring(boxName) .. "): ")
     local rollSource = isMagnet and "Magnet Gacha" or "Gacha"
@@ -1711,12 +1840,12 @@ local function findBestMidWaypoint(startPos, targetPos, waypoints)
 end
 
 -- ===================== Motor de Vuelo Continuo Anti-Rollback =====================
--- 1. BodyVelocity 'EffectsSY' (100k MaxForce, 0 vel) mantiene física gravitacional nula.
--- 2. NoClip continuo en Stepped apagando CanCollide (SIN anular AssemblyLinearVelocity que desincronizaba con el servidor).
--- 3. Velocidad fijada a 164 studs/s (límite exacto de HoHo Hub probado bajo el radar del anticheat de Blox Fruits).
--- 4. Interpolación CFrame continua y limpia (TweenService:Create con EasingStyle.Linear, EasingDirection.Out).
--- 5. Puenteo por waypoints insulares en trayectos largos (>1800 studs) para no cruzar el vacío del océano.
--- 6. Neutralización del script local "Fling and Underwater Glitching Fix" desvinculando GlitchCheck.
+-- 1. BodyVelocity 'EffectsSY' (100k MaxForce, 0 vel) maintains zero gravitational physics.
+-- 2. Continuous NoClip on Stepped disabling CanCollide (WITHOUT overriding AssemblyLinearVelocity which desynchronized with server).
+-- 3. Speed fixed at 164 studs/s (exact HoHo Hub limit tested under Blox Fruits anticheat radar).
+-- 4. Continuous, clean CFrame interpolation (TweenService:Create with EasingStyle.Linear, EasingDirection.Out).
+-- 5. Island waypoint bridging on long distances (>1800 studs) to avoid crossing the open ocean void.
+-- 6. Neutralization of local script 'Fling and Underwater Glitching Fix' by unbinding GlitchCheck.
 local function safeFlightTo(targetPos, options)
     options = options or {}
     if typeof(targetPos) == "CFrame" then
@@ -1774,7 +1903,7 @@ local function safeFlightTo(targetPos, options)
         local curRoot = getRoot()
         if not curRoot then return false end
 
-        -- Altitud segura de crucero sobre el océano (mínimo Y=45 para evitar estado Swimming y oleaje)
+        -- Safe ocean cruising altitude (minimum Y=45 to prevent Swimming state and wave collision)
         local safeY = math.max(destVec.Y, 45)
         local destPos = Vector3.new(destVec.X, safeY, destVec.Z)
 
@@ -1815,7 +1944,7 @@ local function safeFlightTo(targetPos, options)
         return true
     end
 
-    -- En distancias inter-islas largas (> 1800 studs), navegar usando waypoints insulares intermedios
+    -- On long inter-island distances (> 1800 studs), navigate using intermediate island waypoints
     if totalDist > 1800 then
         local waypoints = getIslandWaypoints()
         local midWp = findBestMidWaypoint(curPos, targetPos, waypoints)
@@ -1842,7 +1971,7 @@ local function safeFlightTo(targetPos, options)
         return false
     end
 
-    -- Si el destino original está por debajo de Y=45 (suelo / cofre / fruta), descender suavemente
+    -- If destination is below Y=45 (ground / chest / fruit), descend smoothly
     if isAlive() and targetPos.Y < 45 then
         local curRoot = getRoot()
         if curRoot then
@@ -2229,7 +2358,7 @@ autoAssignStats = function()
         end
     end
 
-    -- 3. Prioridad: Blox Fruit (Demon Fruit) para los puntos restantes
+    -- 3. Priority: Blox Fruit (Demon Fruit) for remaining points
     if fruit < MAX_STAT_CAP and availablePoints > 0 then
         local toAdd = math.min(availablePoints, MAX_STAT_CAP - fruit)
         if toAdd > 0 then
@@ -2241,7 +2370,7 @@ autoAssignStats = function()
     end
 end
 
--- Listener reactivo instantáneo cuando se ganan puntos por nivel o combate
+-- Instant reactive listener when points are gained from level-up or combat
 task.defer(function()
     pcall(function()
         local data = LP:WaitForChild("Data", 30)
@@ -2800,7 +2929,7 @@ local _RegisterAttackRemote       = _NetFolder:WaitForChild("RE/RegisterAttack")
 local _combatUtilOk, _CombatUtil  = pcall(function() return require(ReplicatedStorage:WaitForChild("Modules"):WaitForChild("CombatUtil")) end)
 local _weaponDataOk, _WeaponData  = pcall(function() return require(ReplicatedStorage:WaitForChild("Modules"):WaitForChild("WeaponData")) end)
 
--- A) Inflar HitboxMagnitude Melee a 55 studs (rango máximo seguro del servidor)
+-- A) Inflate Melee HitboxMagnitude to 55 studs (maximum server-safe range)
 if _weaponDataOk and type(_WeaponData) == "table" then
     for _, data in pairs(_WeaponData) do
         if type(data) == "table" and data.WeaponType == "Melee" then
@@ -2830,7 +2959,7 @@ if _combatUtilOk and _CombatUtil and type(_CombatUtil.CanAttack) == "function" t
     end
 end
 
--- Partes válidas del cuerpo para hit registration
+-- Valid body parts for hit registration
 local _COMBAT_LIMBS = { "HumanoidRootPart", "Head", "UpperTorso", "LowerTorso", "LeftHand", "RightHand", "LeftLowerLeg", "RightLowerLeg" }
 local function _getHitPart(model)
     for _, limbName in ipairs(_COMBAT_LIMBS) do
@@ -2843,7 +2972,7 @@ end
 -- comboIndex cicla 1→4 igual que el juego real
 local _comboIndex = 1
 
--- performFullAttack: idéntico a combat.lua
+-- performFullAttack: identical to combat.lua
 local function _performFullAttack(primaryPart, hitList)
     if not primaryPart then return end
     _RegisterAttackRemote:FireServer(0.1, _comboIndex)
@@ -2859,7 +2988,7 @@ local function _performFullAttack(primaryPart, hitList)
 end
 
 -- =========================================================================================
--- [[ >>>>>> INICIO TEMPORAL: MAGNET EVENT (ELIMINAR EN 15 DÍAS) <<<<<< ]]
+-- [[ >>>>>> TEMPORARY: MAGNET EVENT (REMOVE IN 15 DAYS) <<<<<< ]]
 -- =========================================================================================
 MagnetEvent = MagnetEvent or {}
 
@@ -2904,7 +3033,7 @@ local ISLAND_CONFIG = {
     }
 }
 
--- Verificación infalible para asegurar que NUNCA sea un jugador real y pertenezca a workspace
+-- Bulletproof verification ensuring target is NEVER a real player and belongs to workspace
 local function isRealPlayer(model)
     if not model or not model:IsA("Model") then return false end
     if not model:IsDescendantOf(workspace) then return true end -- Descartar templates en ReplicatedStorage
@@ -2925,7 +3054,7 @@ local function isRealPlayer(model)
     return true
 end
 
--- Identificación y balance de Magnet Tokens (ItemId 1146 / 1574)
+-- Identification and balance of Magnet Tokens (ItemId 1146 / 1574)
 function MagnetEvent.getTokenBalance()
     local ok, count = pcall(function()
         local IRService = require(ReplicatedStorage:WaitForChild("ItemReplicationService", 5))
@@ -2942,7 +3071,7 @@ function MagnetEvent.getTokenBalance()
     return (ok and count) or 0
 end
 
--- Detección y recolección de drops de Magnet Event (Scraps y Tokens)
+-- Detection and collection of Magnet Event drops (Scraps and Tokens)
 function MagnetEvent.getDrops()
     local wo = workspace:FindFirstChild("_WorldOrigin")
     if not wo then return {} end
@@ -2953,7 +3082,7 @@ function MagnetEvent.getDrops()
     local root = getRoot()
     local myPos = root and root.Position or Vector3.zero
 
-    -- 1. Scraps magnéticos (comunes para todos los jugadores)
+    -- 1. Magnetic scraps (common for all players)
     local scraps = ie:FindFirstChild("MagnetFruitScraps")
     if scraps then
         for _, item in ipairs(scraps:GetChildren()) do
@@ -2970,7 +3099,7 @@ function MagnetEvent.getDrops()
         end
     end
 
-    -- 2. Tokens del jugador (bajo carpeta con su nombre o general)
+    -- 2. Player tokens (under player-named folder or general)
     local tokensFolder = ie:FindFirstChild("MagnetEventTokens")
     if tokensFolder then
         local myFolder = tokensFolder:FindFirstChild(LP.Name)
@@ -2999,7 +3128,7 @@ function MagnetEvent.hasDrops()
     return #MagnetEvent.getDrops() > 0
 end
 
--- Generación de waypoints de patrulla agrupados en celdas (100x100) según el mar actual
+-- Patrol waypoint generation grouped in cells (100x100) based on current sea
 function MagnetEvent.buildRoamWaypoints()
     local validIslands = ISLAND_CONFIG[CurrentSea] or ISLAND_CONFIG[1]
     local waypoints = {}
@@ -3032,7 +3161,7 @@ function MagnetEvent.buildRoamWaypoints()
         end
     end
 
-    -- Fallback Sea 3 si las ubicaciones no cargaron a tiempo
+    -- Sea 3 fallback if locations did not load in time
     if #waypoints == 0 and CurrentSea == 3 then
         table.insert(waypoints, { name = "Floating Turtle", position = Vector3.new(-12463, 434, -7551) })
         table.insert(waypoints, { name = "Sea of Treats", position = Vector3.new(-2086, 133, -12075) })
@@ -3042,9 +3171,9 @@ function MagnetEvent.buildRoamWaypoints()
     return waypoints
 end
 
--- Detección real y estricta del evento Magnet (Enemigos, Drops, Atmósfera o Cielo)
+-- Real strict detection of Magnet Event (Enemies, Drops, Atmosphere, or Sky)
 function MagnetEvent.isActive()
-    -- 1. Presencia de enemigos magnetizados vivos en CollectionService (solo en workspace)
+    -- 1. Presence of alive magnetized enemies in CollectionService (strictly in workspace)
     local tagged = CollectionService:GetTagged("Magnet Event")
     if #tagged > 0 then
         for _, e in ipairs(tagged) do
@@ -3057,7 +3186,7 @@ function MagnetEvent.isActive()
         end
     end
 
-    -- 2. Presencia física de NPCs enemigos magnetizados vivos en workspace.Enemies
+    -- 2. Physical presence of alive magnetized NPC enemies in workspace.Enemies
     local enemiesFolder = workspace:FindFirstChild("Enemies")
     if enemiesFolder then
         for _, e in ipairs(enemiesFolder:GetChildren()) do
@@ -3070,12 +3199,12 @@ function MagnetEvent.isActive()
         end
     end
 
-    -- 3. Drops activos en _WorldOrigin (Scraps o Tokens)
+    -- 3. Active drops in _WorldOrigin (Scraps or Tokens)
     if MagnetEvent.hasDrops() then
         return true
     end
 
-    -- 4. Capa de atmósfera activa de la tormenta en LightingLayers
+    -- 4. Active storm atmosphere layer in LightingLayers
     local Lighting = game:GetService("Lighting")
     local layers = Lighting:FindFirstChild("LightingLayers")
     local matm = layers and layers:FindFirstChild("MagnetStormAtmosphere")
@@ -3087,7 +3216,7 @@ function MagnetEvent.isActive()
         end
     end
 
-    -- 5. Escombros magnéticos activos en _WorldOrigin
+    -- 5. Active magnetic debris in _WorldOrigin
     local wo = workspace:FindFirstChild("_WorldOrigin")
     if wo and wo:FindFirstChild("InteractiveEffects") then
         local env = wo.InteractiveEffects:FindFirstChild("MagnetEventEnvironment")
@@ -3096,7 +3225,7 @@ function MagnetEvent.isActive()
         end
     end
 
-    -- 6. Skybox oficial de la tormenta magnética
+    -- 6. Official magnetic storm skybox
     local sky = Lighting:FindFirstChildOfClass("Sky")
     if sky and sky.SkyboxBk == "rbxassetid://115775067579169" then
         return true
@@ -3105,7 +3234,7 @@ function MagnetEvent.isActive()
     return false
 end
 
--- Comprobar si el Gacha de Magnet está disponible para tirada
+-- Check if Magnet Gacha is available to roll
 function MagnetEvent.canRoll()
     if MagnetEvent.getTokenBalance() < 500 then
         return false
@@ -3178,7 +3307,7 @@ function MagnetEvent.equipMelee()
     return nil
 end
 
--- Vuelo seguro autónomo a una posición de coordenadas (con soporte para interrupción reactiva si aparecen enemigos)
+-- Autonomous safe flight to coordinate position (supports reactive interruption if enemies appear)
 local function magnetFlightTo(targetPos, interruptCheck, runAliveFunc)
     return safeFlightTo(targetPos, {
         speed = 164,
@@ -3187,14 +3316,14 @@ local function magnetFlightTo(targetPos, interruptCheck, runAliveFunc)
     })
 end
 
--- Obtener todos los enemigos Magnet ordenados por distancia al jugador
+-- Get all Magnet enemies sorted by distance to player
 function MagnetEvent.getMagnetEnemies()
     local list = {}
     local seen = {}
     local root = getRoot()
     local myPos = root and root.Position or Vector3.zero
 
-    -- 1. Buscar enemigos en CollectionService ("Magnet Event") (estrictamente en workspace)
+    -- 1. Find enemies in CollectionService ('Magnet Event') (strictly in workspace)
     local tagged = CollectionService:GetTagged("Magnet Event")
     for _, e in ipairs(tagged) do
         if e:IsA("Model") and e:IsDescendantOf(workspace) and not isRealPlayer(e) and not seen[e] then
@@ -3242,7 +3371,7 @@ function MagnetEvent.getMagnetEnemies()
     return res
 end
 
--- Recolectar drops de magnet event (Scraps y Tokens)
+-- Collect Magnet event drops (Scraps and Tokens)
 function MagnetEvent.collectDrops(runAliveFunc)
     local drops = MagnetEvent.getDrops()
     if #drops == 0 then return false end
@@ -3252,7 +3381,7 @@ function MagnetEvent.collectDrops(runAliveFunc)
         if runAliveFunc and not runAliveFunc() then break end
         if not drop.part or not drop.part.Parent or not drop.part:IsDescendantOf(workspace) then continue end
 
-        -- Si aparece un enemigo mientras recogemos drops, ceder prioridad al combate inmediatamente
+        -- If an enemy appears while collecting drops, yield priority to combat immediately
         if #MagnetEvent.getMagnetEnemies() > 0 then
             return collectedAny
         end
@@ -3275,8 +3404,8 @@ function MagnetEvent.collectDrops(runAliveFunc)
     return collectedAny
 end
 
--- Matar enemigo desde el aire con Tween suave a 30 studs overhead
--- Método verificado: tween a overhead + RegisterAttack + SendHitsToServer (Hitbox 55 studs)
+-- Eliminate enemy from the air with smooth Tween at 30 studs overhead
+-- Verified method: tween to overhead + RegisterAttack + SendHitsToServer (Hitbox 55 studs)
 local function killMagnetEnemy(npc, runAliveFunc)
     if not npc or not npc:IsDescendantOf(workspace) or isRealPlayer(npc) then return false end
     local hum = npc:FindFirstChildOfClass("Humanoid")
@@ -3320,7 +3449,7 @@ local function killMagnetEnemy(npc, runAliveFunc)
 
         MagnetEvent.equipMelee()
 
-        -- NoClip limpio sin tocar AssemblyLinearVelocity (evita desincronizaciones)
+        -- Clean NoClip without altering AssemblyLinearVelocity (prevents desynchronizations)
         local char = LP.Character
         if char then
             for _, p in ipairs(char:GetDescendants()) do
@@ -3365,10 +3494,10 @@ local function killMagnetEnemy(npc, runAliveFunc)
     return enemyDied
 end
 
--- Ciclo completo de ejecución del Magnet Farm con jerarquía de 3 prioridades:
--- Prioridad 1: Eliminar enemigos Magnet (Melee overhead 30 studs + RegisterAttack / SendHitsToServer)
--- Prioridad 2: Recolectar Drops (Scraps y Tokens en _WorldOrigin.InteractiveEffects)
--- Prioridad 3: Fast Server Hop inmediato (StreamingEnabled = false: todos los enemigos/drops del mapa están replicados; si no hay, patrullar es inútil)
+-- Full Magnet Farm execution cycle with 3-tier hierarchy:
+-- Priority 1: Eliminate Magnet enemies (Melee overhead 30 studs + RegisterAttack / SendHitsToServer)
+-- Priority 2: Collect Drops (Scraps and Tokens in _WorldOrigin.InteractiveEffects)
+-- Priority 3: Fast Server Hop immediately (StreamingEnabled = false: all map enemies/drops replicated; if none, hopping is faster)
 function MagnetEvent.runCycle(runAliveFunc)
     setBotActivity("MAGNET_EVENT")
     setStatus("Magnet Storm Active: Starting aerial token hunt...")
@@ -3387,7 +3516,7 @@ function MagnetEvent.runCycle(runAliveFunc)
 
         local enemies = MagnetEvent.getMagnetEnemies()
 
-        -- PRIORIDAD 1: Enemigos magnetizados
+        -- PRIORITY 1: Magnetized enemies
         if #enemies > 0 then
             idleStart = nil
             for _, enemy in ipairs(enemies) do
@@ -3397,7 +3526,7 @@ function MagnetEvent.runCycle(runAliveFunc)
                 local dead = killMagnetEnemy(enemy, runAliveFunc)
                 if dead then
                     totalKills = totalKills + 1
-                    -- Recolección inmediata de los tokens/scraps soltados por este enemigo
+                    -- Immediate collection of tokens/scraps dropped by this enemy
                     task.wait(0.2)
                     MagnetEvent.collectDrops(runAliveFunc)
                     if Cfg.MagnetGacha and MagnetEvent.canRoll() then
@@ -3407,7 +3536,7 @@ function MagnetEvent.runCycle(runAliveFunc)
                 task.wait(0.1)
             end
 
-        -- PRIORIDAD 2: Drops en el suelo (Scraps o Tokens)
+        -- PRIORITY 2: Ground drops (Scraps or Tokens)
         elseif MagnetEvent.hasDrops() then
             idleStart = nil
             setStatus(string.format("Collecting Magnet Drops (Tokens: %d)...", MagnetEvent.getTokenBalance()))
@@ -3417,10 +3546,10 @@ function MagnetEvent.runCycle(runAliveFunc)
             end
 
         -- PRIORIDAD 3: Fast Server Hop
-        -- Con StreamingEnabled = false, los mobs y drops de todo el mapa están replicados en el cliente.
-        -- Si no hay enemigos ni drops activos, patrullar 45s volando es tiempo perdido: hop rápido tras breve gracia.
+        -- With StreamingEnabled = false, all map mobs and drops are replicated on client.
+        -- If no active enemies or drops exist, patrolling 45s is wasted time: fast hop after brief grace period.
         else
-            -- Si el jugador necesita farmear Beli/Level, salir de MagnetEvent inmediatamente para hacer misiones
+            -- If player needs to farm Beli/Level, exit MagnetEvent immediately to farm quests
             if Cfg.AutoQuestFarm and AutoQuestFarm and AutoQuestFarm.needsFarming and AutoQuestFarm.needsFarming() then
                 setStatus("Magnet Event: No targets found. Account needs Beli/Level, switching to AutoQuest...")
                 break
@@ -3430,7 +3559,7 @@ function MagnetEvent.runCycle(runAliveFunc)
                 idleStart = tick()
             end
 
-            -- Si la tormenta terminó mientras estábamos inactivos, salir inmediatamente
+            -- If storm ended while inactive, exit immediately
             if not MagnetEvent.isActive() then
                 break
             end
@@ -3599,7 +3728,7 @@ function AutoQuestFarm.resolveBestQuest(playerLevel)
                 for _, count in pairs(def.Task or {}) do
                     taskCounts = taskCounts + count
                 end
-                -- Regla estricta: sólo misiones con cantidad > 1 (enemigos normales, nunca jefes individuales)
+                -- Strict rule: only quests with count > 1 (normal enemies, never single boss fights)
                 if taskCounts > 1 and req <= playerLevel and req > bestLevel then
                     bestLevel = req
                     bestQuestEntry = def
@@ -3744,7 +3873,7 @@ function AutoQuestFarm.flightTo(destPos, speed, runAliveFunc)
         return true
     end
 
-    -- Altitud de crucero segura si la distancia supera 50 studs (evita agua y desincronización)
+    -- Safe cruising altitude if distance exceeds 50 studs (prevents water contact and desync)
     if totalDist > 50 then
         local safeY = math.max(destPos.Y, 45)
         local midPos = Vector3.new(destPos.X, safeY, destPos.Z)
@@ -3806,7 +3935,7 @@ function AutoQuestFarm.runCycle(runAliveFunc)
         return false
     end
 
-    -- Activar noclip continuo durante la sesión de farmeo de misiones
+    -- Enable continuous noclip during quest farming session
     local noclipActive = true
     local noclipConn = RunService.Stepped:Connect(function()
         if not noclipActive then return end
@@ -3835,7 +3964,7 @@ function AutoQuestFarm.runCycle(runAliveFunc)
     AutoQuestFarm.Status.targetKills = qInfo.targetCount
     setBotActivity("AUTO_QUEST", qInfo)
 
-    -- PASO 1: Aceptar la misión en el NPC dador
+    -- STEP 1: Accept quest at quest-giver NPC
     local questState = AutoQuestFarm.getActiveQuestInfo()
     if not questState then
         setStatus(string.format("AutoQuest: Flying to NPC %s...", qInfo.npcName))
@@ -3877,9 +4006,9 @@ function AutoQuestFarm.runCycle(runAliveFunc)
 
     setStatus(string.format("AutoQuest: %s (%s) — Hunting enemies...", questState.description, questState.progress))
 
-    -- PASO 2: Eliminar mobs requeridos
+    -- STEP 2: Eliminate required mobs
     while questState and (runAliveFunc == nil or runAliveFunc()) and AutoQuestFarm.needsFarming() do
-        -- Verificación y recuperación si el personaje murió
+        -- Check and recover if character died
         if not isAlive() then
             setStatus("AutoQuest: Character died during quest. Waiting for respawn...")
             cleanupNoclip()
@@ -3905,7 +4034,7 @@ function AutoQuestFarm.runCycle(runAliveFunc)
             questState = AutoQuestFarm.getActiveQuestInfo() or questState
         end
 
-        -- Interrupción de máxima prioridad: si spawnea una fruta almacenable
+        -- Maximum priority interruption: if a storable fruit spawns
         if AutoQuestFarm.hasStorableGroundFruit() then
             setStatus("AutoQuest paused: Storable fruit detected on map!")
             cleanupNoclip()
@@ -4018,7 +4147,7 @@ function AutoQuestFarm.runCycle(runAliveFunc)
     AutoQuestFarm.Status.active = false
     setBotActivity("IDLE")
 
-    -- Si la misión terminó (questState es nil)
+    -- If quest completed (questState is nil)
     if not questState then
         Session.quest_completed = (Session.quest_completed or 0) + 1
         local curBeli, curLvl = getPlayerData()
@@ -4080,8 +4209,8 @@ local function mainLoopHost()
                 ensureAlive(35)
             end
             pcall(autoAssignStats)
-            -- [TEMPORARY: MAGNET EVENT HOOK - ELIMINAR EN 15 DÍAS]
-            -- Si el jugador necesita farmear Beli o Nivel para el Gacha, AutoQuest tiene máxima prioridad sobre eventos temporales
+            -- [TEMPORARY: MAGNET EVENT HOOK - REMOVE IN 15 DAYS]
+            -- If player needs Beli or Level for Gacha, AutoQuest has top priority over temporary events
             if Cfg.MagnetFarm and MagnetEvent and MagnetEvent.isActive() and not (Cfg.AutoQuestFarm and AutoQuestFarm and AutoQuestFarm.needsFarming and AutoQuestFarm.needsFarming()) then
                 DiscordAlerts.info("Magnet Storm active! Starting aerial token hunt.", "Magnet Event")
                 local cycleOk, cycleErr = pcall(function()
@@ -5125,7 +5254,7 @@ local function buildStatusUI()
             local now = os.time()
             local cdEnd = tonumber(Session.gacha_cooldown_end) or 0
 
-            -- [TEMPORARY: MAGNET EVENT UI ADAPTER - ELIMINAR EN 15 DÍAS]
+            -- [TEMPORARY: MAGNET EVENT UI ADAPTER - REMOVE IN 15 DAYS]
             local magTokens = (Cfg.MagnetGacha and MagnetEvent and MagnetEvent.getTokenBalance and MagnetEvent.getTokenBalance()) or 0
             local magReady = (Cfg.MagnetGacha and MagnetEvent and MagnetEvent.canRoll and MagnetEvent.canRoll())
             -- [END TEMPORARY: MAGNET EVENT UI ADAPTER]
