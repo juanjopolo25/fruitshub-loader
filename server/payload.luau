@@ -2964,7 +2964,7 @@ if _combatUtilOk and _CombatUtil and type(_CombatUtil.GetWeaponData) == "functio
     end
 end
 
--- C) Hook CanAttack — bypasea cooldowns/stun para el jugador local
+-- C) Hook CanAttack — bypasses cooldowns/stun for the local player
 if _combatUtilOk and _CombatUtil and type(_CombatUtil.CanAttack) == "function" then
     local _rawCanAttack = _CombatUtil.CanAttack
     _CombatUtil.CanAttack = function(self, char, weaponType)
@@ -3273,7 +3273,7 @@ function MagnetEvent.canRoll()
     return true
 end
 
--- Realizar tirada en el Magnet Gacha
+-- Perform roll in the Magnet Gacha
 function MagnetEvent.rollGacha()
     setStatus("Rolling Magnet Gacha (500 tokens)...")
     DiscordAlerts.info("Rolling Magnet Gacha (500 Magnet Tokens)...", "Magnet Gacha Roll")
@@ -3937,7 +3937,7 @@ end
 function AutoQuestFarm.runCycle(runAliveFunc)
     if not AutoQuestFarm.needsFarming() then return true end
 
-    -- Si hay fruta almacenable en el mapa, ceder inmediatamente
+    -- If there is a storable fruit on the map, yield immediately
     if AutoQuestFarm.hasStorableGroundFruit() then
         return "FRUIT_INTERRUPT"
     end
