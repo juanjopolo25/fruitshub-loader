@@ -602,21 +602,33 @@ local function getSeaName()
 end
 
 local function formatDuration(seconds)
-    if not seconds or seconds <= 0 then return "0m" end
-    local h = math.floor(seconds / 3600)
-    local m = math.floor((seconds % 3600) / 60)
-    if h > 0 then
-        return string.format("%dh %02dm", h, m)
+    local rem = math.max(0, math.floor(tonumber(seconds) or 0))
+    local d = math.floor(rem / 86400)
+    local remD = rem % 86400
+    local h = math.floor(remD / 3600)
+    local m = math.floor((remD % 3600) / 60)
+    local s = remD % 60
+    if d > 0 then
+        return string.format("%dd %dh %02dm %02ds", d, h, m, s)
+    elseif h > 0 then
+        return string.format("%dh %02dm %02ds", h, m, s)
+    elseif m > 0 then
+        return string.format("%dm %02ds", m, s)
+    else
+        return string.format("%ds", s)
     end
-    return string.format("%dm", m)
 end
 
 local function formatCountdown(seconds)
     local rem = math.max(0, math.floor(tonumber(seconds) or 0))
-    local h = math.floor(rem / 3600)
-    local m = math.floor((rem % 3600) / 60)
-    local s = rem % 60
-    if h > 0 then
+    local d = math.floor(rem / 86400)
+    local remD = rem % 86400
+    local h = math.floor(remD / 3600)
+    local m = math.floor((remD % 3600) / 60)
+    local s = remD % 60
+    if d > 0 then
+        return string.format("%dd %dh %02dm %02ds", d, h, m, s)
+    elseif h > 0 then
         return string.format("%dh %02dm %02ds", h, m, s)
     elseif m > 0 then
         return string.format("%dm %02ds", m, s)
@@ -977,7 +989,7 @@ local function buildStructuredTelemetry()
             gachaText = string.format("AutoQuest Beli ($%s / $%s)", formatBeli(curBeli), formatBeli(targetCost))
         end
     elseif Session.gacha_cooldown_end > now then
-        gachaText = string.format("%ds cooldown", Session.gacha_cooldown_end - now)
+        gachaText = string.format("%s CD", formatCountdown(Session.gacha_cooldown_end - now))
     elseif Session.gacha_no_beli then
         gachaText = "Out of Beli"
     end
@@ -1014,6 +1026,8 @@ local function buildStructuredTelemetry()
         },
         sessionStats = {
             uptime = uptimeStr,
+            uptimeSeconds = os.time() - Session.session_start,
+            sessionStart = Session.session_start,
             server_hops = Session.server_hops or 0,
             quests = Session.quest_completed or 0,
             fruitsStoredToday = Session.fruits_stored or 0,
