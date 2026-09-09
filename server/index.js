@@ -47,8 +47,8 @@ if (!fs.existsSync(dataDir)) {
     fs.mkdirSync(dataDir, { recursive: true });
 }
 
-const dbUrl = process.env.TURSO_DATABASE_URL || `file:${path.join(dataDir, "fruitshub.db")}`;
-const dbAuthToken = process.env.TURSO_AUTH_TOKEN || undefined;
+const dbUrl = process.env.TURSO_DATABASE_URL || "libsql://fruitshub-juanjopolo25.aws-ap-northeast-1.turso.io";
+const dbAuthToken = process.env.TURSO_AUTH_TOKEN || "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3ODg5NTUxNzIsImlkIjoiMDFhMDg2MDktNDIwMS03YzNjLThiOGYtY2E0NWEyMDY2MWNmIiwia2lkIjoiM2J4RFc3R0lCS0dhWDFWV3h3YWFmQ1AxMm1aaXd6dXVmOUY5WW9iTjVLayIsInJpZCI6ImQwMjg3M2NhLWU3MTUtNDI4MS04NDk0LWQ1ODcxNTc1MmFkNCJ9.0DGWilrthpwMxAAHvghYLwyqsjF8VXsUKYuKV6m7PiLwOmJqljLKFbL-ErgrfWJJwv3TUq5rv-hiSjzg2zdtCA";
 
 const db = createClient({
     url: dbUrl,
