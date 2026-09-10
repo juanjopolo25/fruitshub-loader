@@ -1740,6 +1740,12 @@ app.get("/api/user/telemetry", async (req, res) => {
     });
 });
 
+// 9.4 Static Brand Assets (Logos, Icons)
+app.use("/assets", express.static(path.join(__dirname, "assets"), { maxAge: "7d" }));
+app.get(["/favicon.ico", "/logo.png"], (req, res) => {
+    res.sendFile(path.join(__dirname, "assets", "logo_128.png"));
+});
+
 // 9.5 Admin Console Web Delivery
 app.use("/admin", express.static(path.join(__dirname, "admin")));
 app.get(["/admin", "/admin/*"], (req, res) => {
@@ -1891,6 +1897,8 @@ function renderPortalHtml(activeKey, remainingTimeStr, loaderCode, hwidParam, di
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>FruitsHub Key System</title>
+  <link rel="icon" type="image/png" href="/assets/logo_128.png">
+  <link rel="apple-touch-icon" href="/assets/logo_128.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -1984,17 +1992,16 @@ function renderPortalHtml(activeKey, remainingTimeStr, loaderCode, hwidParam, di
     .brand:hover {
       opacity: 0.9;
     }
-    .brand-badge {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 28px;
-      height: 28px;
-      border-radius: 8px;
-      background: linear-gradient(135deg, #38bdf8 0%, #2563eb 100%);
-      color: #061218;
-      font-weight: 900;
-      font-size: 0.95rem;
+    .brand-logo-img {
+      width: 32px;
+      height: 32px;
+      object-fit: contain;
+      filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.45));
+      transition: transform 0.25s ease, filter 0.25s ease;
+    }
+    .brand:hover .brand-logo-img {
+      transform: rotate(-8deg) scale(1.1);
+      filter: drop-shadow(0 0 14px rgba(56, 189, 248, 0.75));
     }
     .nav-right {
       display: flex;
@@ -2392,7 +2399,7 @@ function renderPortalHtml(activeKey, remainingTimeStr, loaderCode, hwidParam, di
   <header class="navbar">
     <div class="nav-container">
       <a href="/" class="brand">
-        <span class="brand-badge">F</span>
+        <img src="/assets/logo_128.png" alt="FruitsHub Logo" class="brand-logo-img">
         <span>FRUITSHUB</span>
       </a>
       <div class="nav-right">
