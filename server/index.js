@@ -1876,23 +1876,23 @@ function renderPortalHtml(activeKey, remainingTimeStr, loaderCode, hwidParam, di
     // Build notifications if any query param was set
     let noticeHtml = "";
     if (queryParams.auth_error === "cancelled") {
-        noticeHtml = `<div class="portal-alert alert-warning">Has cancelado la autorización con Discord. Se requiere Discord para obtener la key.</div>`;
+        noticeHtml = `<div class="portal-alert alert-warning">Discord authorization was cancelled. Discord verification is required to obtain a key.</div>`;
     } else if (queryParams.auth_error === "oauth_failed") {
-        noticeHtml = `<div class="portal-alert alert-danger">Error de comunicación con Discord. Por favor inténtalo de nuevo.</div>`;
+        noticeHtml = `<div class="portal-alert alert-danger">Failed to communicate with Discord. Please try again.</div>`;
     } else if (queryParams.error === "discord_required") {
-        noticeHtml = `<div class="portal-alert alert-warning">Debes completar la verificación de Discord antes de acceder a los checkpoints.</div>`;
+        noticeHtml = `<div class="portal-alert alert-warning">You must complete Discord verification before accessing checkpoints.</div>`;
     } else if (queryParams.rechecked === "1") {
         if (discordState === "VERIFIED") {
-            noticeHtml = `<div class="portal-alert alert-success">¡Verificación completada! Rol entregado y checkpoints desbloqueados.</div>`;
+            noticeHtml = `<div class="portal-alert alert-success">Verification complete! Role granted and checkpoints unlocked.</div>`;
         } else if (discordState === "MISSING_REQUIRED_ROLE") {
-            noticeHtml = `<div class="portal-alert alert-warning">Aún no tienes el rol de Miembro verificado en el servidor. Completa el enlace de Vaultcord abajo.</div>`;
+            noticeHtml = `<div class="portal-alert alert-warning">Verified Member role not detected yet. Please complete the Vaultcord verification below.</div>`;
         } else if (discordState === "NOT_IN_GUILD") {
-            noticeHtml = `<div class="portal-alert alert-warning">Aún no estás dentro del servidor. Únete usando el botón de invitación abajo.</div>`;
+            noticeHtml = `<div class="portal-alert alert-warning">You have not joined the Discord server yet. Please join using the invite button below.</div>`;
         }
     }
 
     return `<!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -2287,25 +2287,6 @@ function renderPortalHtml(activeKey, remainingTimeStr, loaderCode, hwidParam, di
       flex-shrink: 0;
     }
 
-    .features-list {
-      list-style: none;
-      margin: 24px 0 32px 0;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-    .features-list li {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-size: 0.98rem;
-      color: #cbd5e1;
-    }
-    .features-list svg {
-      color: var(--accent-cyan);
-      flex-shrink: 0;
-    }
-
     .btn-row {
       display: flex;
       gap: 14px;
@@ -2404,14 +2385,14 @@ function renderPortalHtml(activeKey, remainingTimeStr, loaderCode, hwidParam, di
       </a>
       <div class="nav-right">
         ${discordUser ? `
-          <div class="user-pill" title="Sesión iniciada con Discord">
+          <div class="user-pill" title="Signed in with Discord">
             <img src="${escapeHtml(discordUser.avatar)}" alt="Avatar">
             <span>${escapeHtml(discordUser.username)}</span>
-            <a href="/api/auth/discord/logout?hwid=${encodeURIComponent(hwidParam)}" title="Cerrar sesión de Discord" style="color: var(--text-tertiary); text-decoration: none; margin-left: 4px; font-size: 1rem; line-height: 1;">&times;</a>
+            <a href="/api/auth/discord/logout?hwid=${encodeURIComponent(hwidParam)}" title="Sign out of Discord" style="color: var(--text-tertiary); text-decoration: none; margin-left: 4px; font-size: 1rem; line-height: 1;">&times;</a>
           </div>
         ` : ""}
         <span class="nav-tag ${activeKey ? "green" : (discordState === "VERIFIED" ? "green" : (discordUser ? "discord" : ""))}">
-          ${activeKey ? "Key Activa" : (discordState === "VERIFIED" ? "Verificado ✓" : "Key System")}
+          ${activeKey ? "Active Key" : (discordState === "VERIFIED" ? "Verified ✓" : "Key System")}
         </span>
       </div>
     </div>
@@ -2422,16 +2403,16 @@ function renderPortalHtml(activeKey, remainingTimeStr, loaderCode, hwidParam, di
       ${noticeHtml}
 
       ${activeKey ? `
-        <!-- ==================== VISTA: KEY ACTIVA ==================== -->
+        <!-- ==================== VIEW: ACTIVE KEY ==================== -->
         <div class="card">
-          <span class="step-badge green">✓ DISPOSITIVO AUTORIZADO</span>
-          <h1 class="card-title">Key Activa</h1>
-          <p class="card-desc">Ya dispones de una clave vigente vinculada a este dispositivo (${remainingTimeStr}).</p>
+          <span class="step-badge green">✓ AUTHORIZED DEVICE</span>
+          <h1 class="card-title">Active Key</h1>
+          <p class="card-desc">You already have an active key bound to this device (${remainingTimeStr}).</p>
 
           <div style="margin-bottom: 28px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-              <span class="info-label" style="margin-bottom: 0;">Tu Clave de Acceso</span>
-              <button class="btn btn-secondary" style="padding: 8px 18px; font-size: 0.85rem;" onclick="copyText('raw-key', this)">Copiar Key</button>
+              <span class="info-label" style="margin-bottom: 0;">Your Access Key</span>
+              <button class="btn btn-secondary" style="padding: 8px 18px; font-size: 0.85rem;" onclick="copyText('raw-key', this)">Copy Key</button>
             </div>
             <div class="code-box" style="margin-bottom: 0; padding: 18px 22px; display: block; word-break: break-all; overflow-wrap: anywhere;">
               <span id="raw-key" style="font-weight: 600; color: var(--accent-cyan); font-size: 1rem; line-height: 1.6; word-break: break-all; overflow-wrap: anywhere; user-select: all; display: block;">${activeKey}</span>
@@ -2441,7 +2422,7 @@ function renderPortalHtml(activeKey, remainingTimeStr, loaderCode, hwidParam, di
           <div style="margin-bottom: 8px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
               <span class="info-label" style="margin-bottom: 0;">Roblox Universal Loader</span>
-              <button class="btn btn-primary" style="padding: 8px 20px; font-size: 0.85rem;" onclick="copyText('raw-loader', this)">Copiar Loader</button>
+              <button class="btn btn-primary" style="padding: 8px 20px; font-size: 0.85rem;" onclick="copyText('raw-loader', this)">Copy Loader</button>
             </div>
             <div class="code-box" style="margin-bottom: 0; padding: 18px 22px; display: block;">
               <pre id="raw-loader" style="margin: 0; font-family: var(--font-mono); font-size: 0.92rem; line-height: 1.65; color: #cbd5e1; white-space: pre-wrap; word-break: break-word; user-select: all;">${escapeHtml(loaderCode)}</pre>
@@ -2450,110 +2431,95 @@ function renderPortalHtml(activeKey, remainingTimeStr, loaderCode, hwidParam, di
         </div>
 
       ` : discordState === "UNAUTHENTICATED" ? `
-        <!-- ==================== ESTADO 0: LOGIN DISCORD REQUERIDO ==================== -->
+        <!-- ==================== STATE 0: DISCORD LOGIN REQUIRED ==================== -->
         <div class="card">
           <span class="step-badge discord">
             <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994.021-.041.001-.09-.041-.106a13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.929 1.793 8.18 1.793 12.061 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.894.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/></svg>
-            VERIFICACIÓN OBLIGATORIA
+            DISCORD VERIFICATION REQUIRED
           </span>
-          <h1 class="card-title">Acceso al Key System</h1>
-          <p class="card-desc">Para obtener tu clave de 24 horas y proteger nuestro servicio contra multicuentas y bots, inicia sesión con tu cuenta de Discord de la comunidad.</p>
-
-          <ul class="features-list">
-            <li>
-              <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
-              <span>Acceso directo a la generación de keys gratuitas (24 horas)</span>
-            </li>
-            <li>
-              <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
-              <span>Entrega automática del rol oficial <strong style="color: #c7d2fe;">@user</strong> en Discord</span>
-            </li>
-            <li>
-              <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
-              <span>100% seguro: solo autorización básica de identidad (sin permisos invasivos)</span>
-            </li>
-          </ul>
+          <h1 class="card-title">FruitsHub Key System</h1>
+          <p class="card-desc">To obtain your 24-hour key and protect our service against bots and abuse, please sign in with your community Discord account.</p>
 
           <a id="discord-login-btn" href="/api/auth/discord/login?hwid=${encodeURIComponent(hwidParam)}" class="btn btn-discord" style="width: 100%; padding: 18px 28px; font-size: 1.05rem;">
             <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994.021-.041.001-.09-.041-.106a13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.929 1.793 8.18 1.793 12.061 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.894.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/></svg>
-            <span>Iniciar Sesión con Discord</span>
+            <span>Sign in with Discord</span>
           </a>
         </div>
 
       ` : discordState === "NOT_IN_GUILD" ? `
-        <!-- ==================== ESTADO 1: NO ESTÁ EN EL SERVIDOR ==================== -->
+        <!-- ==================== STATE 1: NOT IN SERVER ==================== -->
         <div class="card">
-          <span class="step-badge amber">PASO 1 DE 2 · SERVIDOR REQUERIDO</span>
-          <h1 class="card-title">Únete a nuestro Discord</h1>
-          <p class="card-desc">Has conectado tu cuenta <strong style="color: #fff;">${escapeHtml(discordUser.tag)}</strong>, pero todavía no perteneces a la comunidad oficial de FruitsHub.</p>
+          <span class="step-badge amber">STEP 1 OF 2 · SERVER MEMBERSHIP REQUIRED</span>
+          <h1 class="card-title">Join our Discord Server</h1>
+          <p class="card-desc">Signed in as <strong style="color: #fff;">${escapeHtml(discordUser.tag)}</strong>, but you are not a member of the official FruitsHub server yet.</p>
 
           <div class="instruction-box">
             <div class="instruction-step">
               <div class="step-num">1</div>
-              <div>Únete a nuestro servidor haciendo clic en <strong>"Unirme al Servidor"</strong>.</div>
+              <div>Join our server by clicking <strong>"Join Server"</strong> below.</div>
             </div>
             <div class="instruction-step">
               <div class="step-num">2</div>
-              <div>Tras unirte, vuelve aquí y pulsa <strong>"Ya me uní (Comprobar)"</strong> para verificar tu membresía.</div>
+              <div>After joining, return here and click <strong>"I Joined (Check Again)"</strong> to verify your membership.</div>
             </div>
           </div>
 
           <div class="btn-row">
             <a href="${inviteUrl}" target="_blank" rel="noopener noreferrer" class="btn btn-discord" style="flex: 1;">
               <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994.021-.041.001-.09-.041-.106a13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.929 1.793 8.18 1.793 12.061 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.894.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/></svg>
-              <span>Unirme al Servidor</span>
+              <span>Join Server</span>
             </a>
             <a href="/api/auth/discord/recheck?hwid=${encodeURIComponent(hwidParam)}" class="btn btn-primary" style="flex: 1;">
               <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
-              <span>Ya me uní (Comprobar)</span>
+              <span>I Joined (Check Again)</span>
             </a>
           </div>
 
           <div style="margin-top: 24px; text-align: center;">
             <a href="/api/auth/discord/logout?hwid=${encodeURIComponent(hwidParam)}" style="color: var(--text-tertiary); font-size: 0.85rem; text-decoration: none;">
-              ¿Cuenta equivocada? Iniciar sesión con otro Discord
+              Wrong account? Sign in with another Discord account
             </a>
           </div>
         </div>
 
       ` : discordState === "MISSING_REQUIRED_ROLE" ? `
-        <!-- ==================== ESTADO 2: EN EL SERVIDOR PERO FALTA VAULTCORD ==================== -->
+        <!-- ==================== STATE 2: IN SERVER BUT MISSING VAULTCORD ==================== -->
         <div class="card">
-          <span class="step-badge amber">PASO 2 DE 2 · VERIFICACIÓN DE SEGURIDAD</span>
-          <h1 class="card-title">Verifícate en nuestro Servidor</h1>
-          <p class="card-desc">¡Estás dentro del servidor! Sin embargo, debes verificar tu cuenta mediante <strong>Vaultcord</strong> para obtener el rol de Miembro de la comunidad.</p>
+          <span class="step-badge amber">STEP 2 OF 2 · SECURITY VERIFICATION</span>
+          <h1 class="card-title">Verify in our Server</h1>
+          <p class="card-desc">You are in the server! Now complete the official <strong>Vaultcord</strong> verification to receive your Member role.</p>
 
           <div class="instruction-box">
             <div class="instruction-step">
               <div class="step-num">1</div>
-              <div>Haz clic en <strong>"Verificarme con Vaultcord"</strong> para completar la validación de seguridad en Discord.</div>
+              <div>Click <strong>"Verify with Vaultcord"</strong> to complete the security validation in Discord.</div>
             </div>
             <div class="instruction-step">
               <div class="step-num">2</div>
-              <div>Una vez completada la autorización de Vaultcord, pulsa <strong>"Ya me verifiqué (Comprobar)"</strong> para recibir tu nuevo rol y desbloquear la key.</div>
+              <div>Once completed, return here and click <strong>"I'm Verified (Check Again)"</strong> to receive your role and unlock your key.</div>
             </div>
           </div>
 
           <div class="btn-row">
             <a href="${vaultcordUrl}" target="_blank" rel="noopener noreferrer" class="btn btn-amber" style="flex: 1;">
               <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
-              <span>Verificarme con Vaultcord</span>
+              <span>Verify with Vaultcord</span>
             </a>
             <a href="/api/auth/discord/recheck?hwid=${encodeURIComponent(hwidParam)}" class="btn btn-green" style="flex: 1;">
               <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
-              <span>Ya me verifiqué (Comprobar)</span>
+              <span>I'm Verified (Check Again)</span>
             </a>
           </div>
 
           <div style="margin-top: 24px; text-align: center;">
             <a href="/api/auth/discord/logout?hwid=${encodeURIComponent(hwidParam)}" style="color: var(--text-tertiary); font-size: 0.85rem; text-decoration: none;">
-              ¿Cuenta equivocada? Iniciar sesión con otro Discord
+              Wrong account? Sign in with another Discord account
             </a>
           </div>
         </div>
 
       ` : `
-        <!-- ==================== ESTADO 3: VERIFICADO (SELECCIÓN CHECKPOINTS) ==================== -->
+        <!-- ==================== STATE 3: VERIFIED (CHECKPOINT SELECTION) ==================== -->
         <div class="card">
           <!-- Verified banner -->
           <div class="verified-user-banner">
@@ -2561,49 +2527,49 @@ function renderPortalHtml(activeKey, remainingTimeStr, loaderCode, hwidParam, di
               <img class="user-avatar-big" src="${escapeHtml(discordUser ? discordUser.avatar : 'https://cdn.discordapp.com/embed/avatars/0.png')}" alt="Avatar">
               <div>
                 <div style="font-weight: 700; color: #fff; font-size: 1rem; display: flex; align-items: center; gap: 8px;">
-                  <span>${escapeHtml(discordUser ? discordUser.tag : 'Usuario')}</span>
-                  <span class="step-badge green" style="padding: 2px 8px; font-size: 0.72rem; margin-bottom: 0;">Verificado ✓</span>
+                  <span>${escapeHtml(discordUser ? discordUser.tag : 'User')}</span>
+                  <span class="step-badge green" style="padding: 2px 8px; font-size: 0.72rem; margin-bottom: 0;">Verified ✓</span>
                 </div>
                 <div style="font-size: 0.82rem; color: #86efac; margin-top: 2px;">
-                  Rol <span style="font-family: var(--font-mono); font-weight: 700;">@user</span> entregado en FruitsHub Discord
+                  Role <span style="font-family: var(--font-mono); font-weight: 700;">@user</span> delivered in FruitsHub Discord
                 </div>
               </div>
             </div>
-            <a href="/api/auth/discord/recheck?hwid=${encodeURIComponent(hwidParam)}" class="btn btn-secondary" style="padding: 8px 14px; font-size: 0.8rem;" title="Sincronizar estado con Discord">
-              Sincronizar
+            <a href="/api/auth/discord/recheck?hwid=${encodeURIComponent(hwidParam)}" class="btn btn-secondary" style="padding: 8px 14px; font-size: 0.8rem;" title="Sync status with Discord">
+              Sync
             </a>
           </div>
 
           <h1 class="card-title">FruitsHub Key System</h1>
-          <p class="card-desc">Elige tu proveedor preferido y completa los 3 checkpoints para generar tu key de 24 horas.</p>
+          <p class="card-desc">Choose your preferred provider and complete 3 checkpoints to generate your 24-hour key.</p>
 
           ${hwidParam ? `
-            <span class="info-label">Hardware ID (HWID Vinculado)</span>
+            <span class="info-label">Hardware ID (Bound HWID)</span>
             <div class="code-box" style="margin-bottom: 28px;">
               <span style="font-size: 0.9rem; color: #cbd5e1;">${escapeHtml(hwidParam)}</span>
             </div>
           ` : ""}
 
-          <span class="info-label">Selecciona Proveedor</span>
+          <span class="info-label">Choose Provider</span>
           <div class="provider-grid">
             <!-- LootLabs -->
             <a href="/checkpoint/start?provider=lootlabs&hwid=${encodeURIComponent(hwidParam || "DEFAULT_USER")}" class="provider-card">
               <div>
-                <span class="provider-badge cyan">Recomendado</span>
+                <span class="provider-badge cyan">Recommended</span>
                 <div class="provider-title">LootLabs</div>
-                <div class="provider-sub">3 Checkpoints rápidos con menor publicidad</div>
+                <div class="provider-sub">3 fast checkpoints with fewer ads</div>
               </div>
-              <div class="btn btn-primary" style="width: 100%;">Obtener Key via LootLabs</div>
+              <div class="btn btn-primary" style="width: 100%;">Get Key via LootLabs</div>
             </a>
 
             <!-- Linkvertise -->
             <a href="/checkpoint/start?provider=linkvertise&hwid=${encodeURIComponent(hwidParam || "DEFAULT_USER")}" class="provider-card">
               <div>
-                <span class="provider-badge gray">Alternativa</span>
+                <span class="provider-badge gray">Alternative</span>
                 <div class="provider-title">Linkvertise</div>
-                <div class="provider-sub">3 Checkpoints estándar de Linkvertise</div>
+                <div class="provider-sub">3 standard Linkvertise checkpoints</div>
               </div>
-              <div class="btn btn-secondary" style="width: 100%;">Obtener Key via Linkvertise</div>
+              <div class="btn btn-secondary" style="width: 100%;">Get Key via Linkvertise</div>
             </a>
           </div>
         </div>
@@ -2612,7 +2578,7 @@ function renderPortalHtml(activeKey, remainingTimeStr, loaderCode, hwidParam, di
   </main>
 
   <footer class="footer">
-    FruitsHub &copy; 2026 &bull; Key System Gateway &bull; Protegido con Discord Auth
+    FruitsHub &copy; 2026 &bull; Key System Gateway &bull; Protected by Discord Auth
   </footer>
 
   <script>
@@ -2646,7 +2612,7 @@ function renderPortalHtml(activeKey, remainingTimeStr, loaderCode, hwidParam, di
       const text = document.getElementById(elemId).innerText;
       navigator.clipboard.writeText(text).then(() => {
         const old = btn.innerText;
-        btn.innerText = "¡Copiado!";
+        btn.innerText = "Copied!";
         setTimeout(() => btn.innerText = old, 1500);
       });
     }
