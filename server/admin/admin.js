@@ -303,7 +303,19 @@ const AdminApp = (() => {
       `;
     });
 
-    listEl.innerHTML = html;
+  // Key Pill Formatter (Prevents vertical breaking and allows 1-click copy)
+  function formatKeyPill(key) {
+    if (!key || key === "NONE") return `<span style="color: var(--text-muted);">—</span>`;
+    const display = key.length > 24 
+      ? `${key.substring(0, 10)}...${key.substring(key.length - 8)}` 
+      : key;
+    return `
+      <div class="key-pill-wrap" title="Key: ${escapeHtml(key)} (Clic para copiar)" onclick="AdminApp.copyText('${escapeHtml(key)}')">
+        <span style="font-size: 0.8rem;">🔑</span>
+        <code class="key-pill-code">${escapeHtml(display)}</code>
+        <span class="key-copy-hint">Copiar</span>
+      </div>
+    `;
   }
 
   // Load Keys Data
@@ -353,9 +365,9 @@ const AdminApp = (() => {
         // HWID badge
         let hwidBadge = `<span class="badge badge-unset">UNSET (Libre)</span>`;
         if (isBound) {
-          const shortHwid = k.hwid.length > 16 ? `${k.hwid.substring(0, 8)}...${k.hwid.substring(k.hwid.length - 6)}` : k.hwid;
+          const shortHwid = k.hwid.length > 18 ? `${k.hwid.substring(0, 8)}...${k.hwid.substring(k.hwid.length - 6)}` : k.hwid;
           hwidBadge = `
-            <span class="badge badge-bound" title="${escapeHtml(k.hwid)}">
+            <span class="badge badge-bound" title="${escapeHtml(k.hwid)} (Clic para copiar)" style="cursor: pointer;" onclick="AdminApp.copyText('${escapeHtml(k.hwid)}')">
               🔒 ${escapeHtml(shortHwid)}
             </span>
           `;
@@ -371,13 +383,10 @@ const AdminApp = (() => {
         rowsHtml += `
           <tr>
             <td>
-              <div style="display: flex; align-items: center; gap: 6px;">
-                <code class="font-mono text-cyan" style="font-size: 0.8rem; word-break: break-all;">${escapeHtml(k.key)}</code>
-                <button class="btn-action btn-action-toggle" style="padding: 2px 6px;" title="Copiar key" onclick="AdminApp.copyText('${escapeHtml(k.key)}')">📋</button>
-              </div>
+              ${formatKeyPill(k.key)}
             </td>
             <td>
-              <span style="font-size: 0.8rem; color: ${k.note ? '#fff' : 'var(--text-muted)'}">
+              <span style="font-size: 0.82rem; color: ${k.note ? '#fff' : 'var(--text-muted)'}">
                 ${escapeHtml(k.note || "—")}
               </span>
             </td>
@@ -697,7 +706,7 @@ const AdminApp = (() => {
               </span>
             </td>
             <td>
-              <code class="font-mono text-cyan" title="${escapeHtml(log.key)}">${escapeHtml(shortKey)}</code>
+              ${formatKeyPill(log.key)}
             </td>
             <td>
               <strong style="color: #fff;">${escapeHtml(log.executor)}</strong>

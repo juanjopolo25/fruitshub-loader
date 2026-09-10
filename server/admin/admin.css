@@ -620,14 +620,14 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 14px;
+  gap: 12px;
   margin-bottom: 20px;
   flex-wrap: wrap;
 }
 .search-input-wrap {
   position: relative;
-  flex: 1;
-  min-width: 260px;
+  flex: 1 1 260px;
+  min-width: 220px;
 }
 .search-icon {
   position: absolute;
@@ -660,27 +660,93 @@ body {
   gap: 10px;
   flex-wrap: wrap;
 }
+.filter-controls-group .form-select {
+  width: auto;
+  min-width: 145px;
+  flex: 0 0 auto;
+}
+.filter-controls-group .btn {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
 
 /* ==================== DATA TABLES ==================== */
 .table-responsive {
   width: 100%;
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: rgba(0, 0, 0, 0.2);
 }
 .data-table {
   width: 100%;
+  min-width: 1050px;
   border-collapse: collapse;
   font-size: 0.85rem;
   text-align: left;
 }
 .data-table th {
-  padding: 12px 14px;
+  padding: 14px 16px;
   font-family: var(--font-mono);
   font-size: 0.72rem;
   color: var(--text-tertiary);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   border-bottom: 1px solid var(--border-subtle);
+  background: rgba(255, 255, 255, 0.02);
   white-space: nowrap;
+}
+.data-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  color: var(--text-primary);
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.data-table tr:hover td {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+/* Key Pill */
+.key-pill-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(56, 189, 248, 0.08);
+  border: 1px solid rgba(56, 189, 248, 0.22);
+  border-radius: var(--radius-sm);
+  padding: 5px 9px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+.key-pill-wrap:hover {
+  background: rgba(56, 189, 248, 0.18);
+  border-color: var(--cyan-400);
+  box-shadow: 0 0 12px var(--cyan-glow);
+}
+.key-pill-code {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  color: var(--cyan-400);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.key-copy-hint {
+  font-size: 0.68rem;
+  font-family: var(--font-mono);
+  color: var(--text-tertiary);
+  background: rgba(255, 255, 255, 0.06);
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: all 0.15s ease;
+}
+.key-pill-wrap:hover .key-copy-hint {
+  color: #fff;
+  background: rgba(56, 189, 248, 0.35);
+  border-color: var(--cyan-400);
 }
 .data-table td {
   padding: 12px 14px;
