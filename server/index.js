@@ -1621,35 +1621,45 @@ function renderPortalHtml(activeKey, remainingTimeStr, loaderCode, hwidParam) {
   <title>FruitsHub Key System</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg-primary: #0b0e14;
-      --bg-secondary: #0f131a;
-      --bg-card: #121620;
-      --border-subtle: rgba(255, 255, 255, 0.07);
-      --border-active: rgba(56, 189, 248, 0.35);
-      --text-primary: #f1f5f9;
+      --bg-primary: #070a0f;
+      --bg-secondary: #0d121b;
+      --bg-card: #101622;
+      --bg-card-hover: #141c2c;
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --border-active: rgba(56, 189, 248, 0.5);
+      --text-primary: #f8fafc;
       --text-secondary: #94a3b8;
       --text-tertiary: #64748b;
       --accent-cyan: #38bdf8;
+      --accent-cyan-hover: #7dd3fc;
       --accent-green: #22c55e;
-      --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       --font-mono: 'JetBrains Mono', monospace;
-      --radius-md: 10px;
-      --radius-lg: 14px;
+      --radius-md: 12px;
+      --radius-lg: 16px;
+      --radius-xl: 20px;
     }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    html, body {
+      min-height: 100vh;
+    }
+
     body {
       background-color: var(--bg-primary);
       color: var(--text-primary);
       font-family: var(--font-sans);
       line-height: 1.6;
       -webkit-font-smoothing: antialiased;
-      min-height: 100vh;
       display: flex;
       flex-direction: column;
+      position: relative;
+      overflow-x: hidden;
     }
+
     .ambient-glow {
       position: fixed;
       border-radius: 50%;
@@ -1657,98 +1667,134 @@ function renderPortalHtml(activeKey, remainingTimeStr, loaderCode, hwidParam) {
       z-index: 0;
       filter: blur(120px);
     }
-    .glow-top {
-      top: -150px;
+    .glow-center {
+      top: 50%;
       left: 50%;
-      transform: translateX(-50%);
-      width: 600px;
-      height: 350px;
-      background: radial-gradient(circle, rgba(56, 189, 248, 0.08) 0%, rgba(11, 14, 20, 0) 70%);
+      transform: translate(-50%, -50%);
+      width: 960px;
+      height: 640px;
+      background: radial-gradient(circle, rgba(56, 189, 248, 0.1) 0%, rgba(99, 102, 241, 0.04) 45%, rgba(7, 10, 15, 0) 75%);
     }
+
     .navbar {
       position: sticky;
       top: 0;
       width: 100%;
       backdrop-filter: blur(16px);
       -webkit-backdrop-filter: blur(16px);
-      background: rgba(11, 14, 20, 0.8);
+      background: rgba(7, 10, 15, 0.85);
       border-bottom: 1px solid var(--border-subtle);
       z-index: 100;
     }
     .nav-container {
-      max-width: 760px;
+      max-width: 1120px;
       margin: 0 auto;
-      padding: 16px 24px;
+      padding: 18px 32px;
       display: flex;
       align-items: center;
       justify-content: space-between;
     }
     .brand {
-      font-weight: 700;
-      font-size: 0.95rem;
+      font-weight: 800;
+      font-size: 1.15rem;
       letter-spacing: 0.08em;
       color: var(--accent-cyan);
       text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      transition: opacity 0.2s;
+    }
+    .brand:hover {
+      opacity: 0.9;
+    }
+    .brand-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #38bdf8 0%, #2563eb 100%);
+      color: #061218;
+      font-weight: 900;
+      font-size: 0.95rem;
     }
     .nav-tag {
       font-family: var(--font-mono);
-      font-size: 0.75rem;
-      padding: 3px 10px;
-      border-radius: 6px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      padding: 5px 14px;
+      border-radius: 8px;
       background: rgba(255, 255, 255, 0.05);
       border: 1px solid var(--border-subtle);
       color: var(--text-secondary);
+      letter-spacing: 0.03em;
     }
     .nav-tag.green {
       color: var(--accent-green);
-      border-color: rgba(34, 197, 94, 0.25);
-      background: rgba(34, 197, 94, 0.06);
+      border-color: rgba(34, 197, 94, 0.3);
+      background: rgba(34, 197, 94, 0.08);
+    }
+
+    /* Centers the card perfectly both horizontally and vertically */
+    .main-wrapper {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 48px 24px;
+      position: relative;
+      z-index: 1;
+      width: 100%;
     }
     .container {
       width: 100%;
-      max-width: 760px;
-      margin: 40px auto;
-      padding: 0 24px;
-      position: relative;
-      z-index: 1;
-      flex: 1;
+      max-width: 940px;
+      margin: 0 auto;
     }
     .card {
       background: var(--bg-card);
       border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-lg);
-      padding: 32px;
-      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4);
+      border-radius: var(--radius-xl);
+      padding: 48px 52px;
+      box-shadow: 0 24px 60px -12px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.03);
+      backdrop-filter: blur(12px);
+      position: relative;
     }
     .card-title {
-      font-size: 1.45rem;
-      font-weight: 700;
-      color: #fff;
-      margin-bottom: 6px;
+      font-size: 2.25rem;
+      font-weight: 800;
+      color: #ffffff;
+      letter-spacing: -0.025em;
+      margin-bottom: 10px;
+      line-height: 1.2;
     }
     .card-desc {
       color: var(--text-secondary);
-      font-size: 0.92rem;
-      margin-bottom: 24px;
+      font-size: 1.12rem;
+      margin-bottom: 34px;
+      line-height: 1.6;
     }
     .info-label {
-      font-size: 0.75rem;
+      font-size: 0.82rem;
       font-family: var(--font-mono);
+      font-weight: 700;
       color: var(--text-tertiary);
       text-transform: uppercase;
-      letter-spacing: 0.05em;
-      margin-bottom: 6px;
+      letter-spacing: 0.08em;
+      margin-bottom: 12px;
       display: block;
     }
     .code-box {
-      background: #080a0f;
-      border: 1px solid var(--border-subtle);
+      background: #06080d;
+      border: 1px solid rgba(255, 255, 255, 0.09);
       border-radius: var(--radius-md);
-      padding: 12px 16px;
+      padding: 18px 22px;
       font-family: var(--font-mono);
-      font-size: 0.85rem;
+      font-size: 0.95rem;
       color: var(--accent-cyan);
-      margin-bottom: 20px;
+      margin-bottom: 24px;
       min-width: 0;
       max-width: 100%;
       word-break: break-all;
@@ -1759,25 +1805,28 @@ function renderPortalHtml(activeKey, remainingTimeStr, loaderCode, hwidParam) {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      padding: 10px 18px;
+      padding: 14px 24px;
       border-radius: var(--radius-md);
-      font-size: 0.85rem;
-      font-weight: 600;
+      font-size: 0.96rem;
+      font-weight: 700;
       cursor: pointer;
       text-decoration: none;
-      transition: all 0.15s ease;
+      transition: all 0.2s ease;
       border: none;
       font-family: var(--font-sans);
       white-space: nowrap;
       flex-shrink: 0;
+      letter-spacing: 0.01em;
     }
     .btn-primary {
       background: var(--accent-cyan);
       color: #061218;
-      box-shadow: 0 4px 12px rgba(56, 189, 248, 0.2);
+      box-shadow: 0 4px 16px rgba(56, 189, 248, 0.25);
     }
     .btn-primary:hover {
-      background: #7dd3fc;
+      background: var(--accent-cyan-hover);
+      box-shadow: 0 6px 20px rgba(56, 189, 248, 0.35);
+      transform: translateY(-1px);
     }
     .btn-secondary {
       background: rgba(255, 255, 255, 0.06);
@@ -1785,136 +1834,169 @@ function renderPortalHtml(activeKey, remainingTimeStr, loaderCode, hwidParam) {
       border: 1px solid var(--border-subtle);
     }
     .btn-secondary:hover {
-      background: rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.12);
+      border-color: rgba(255, 255, 255, 0.18);
+      transform: translateY(-1px);
     }
     .provider-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 16px;
-      margin-top: 16px;
+      gap: 24px;
+      margin-top: 14px;
     }
-    @media (max-width: 540px) {
-      .provider-grid { grid-template-columns: 1fr; }
+    @media (max-width: 720px) {
+      .main-wrapper { padding: 24px 16px; }
+      .card { padding: 32px 24px; }
+      .card-title { font-size: 1.7rem; }
+      .card-desc { font-size: 1rem; margin-bottom: 24px; }
+      .provider-grid { grid-template-columns: 1fr; gap: 16px; }
+      .nav-container { padding: 14px 20px; }
     }
     .provider-card {
-      background: #0e121a;
+      background: var(--bg-secondary);
       border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-md);
-      padding: 20px;
+      border-radius: var(--radius-lg);
+      padding: 32px 28px;
       text-decoration: none;
       color: inherit;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
-      transition: all 0.2s ease;
+      min-height: 220px;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
     }
     .provider-card:hover {
       border-color: var(--border-active);
-      background: #111722;
-      transform: translateY(-2px);
+      background: var(--bg-card-hover);
+      transform: translateY(-3px);
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45), 0 0 24px rgba(56, 189, 248, 0.1);
     }
     .provider-badge {
-      font-size: 0.72rem;
+      font-size: 0.78rem;
       font-family: var(--font-mono);
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      padding: 4px 10px;
+      border-radius: 6px;
+      display: inline-block;
+      width: fit-content;
+      margin-bottom: 12px;
+    }
+    .provider-badge.cyan {
       color: var(--accent-cyan);
-      margin-bottom: 6px;
+      background: rgba(56, 189, 248, 0.1);
+      border: 1px solid rgba(56, 189, 248, 0.25);
+    }
+    .provider-badge.gray {
+      color: var(--text-secondary);
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-subtle);
     }
     .provider-title {
-      font-size: 1.05rem;
-      font-weight: 700;
-      color: #fff;
-      margin-bottom: 4px;
+      font-size: 1.45rem;
+      font-weight: 800;
+      color: #ffffff;
+      margin-bottom: 6px;
+      letter-spacing: -0.01em;
     }
     .provider-sub {
-      font-size: 0.8rem;
+      font-size: 0.95rem;
       color: var(--text-secondary);
-      margin-bottom: 16px;
+      margin-bottom: 24px;
+      line-height: 1.5;
     }
     .footer {
       text-align: center;
       padding: 24px;
-      font-size: 0.8rem;
+      font-size: 0.85rem;
       color: var(--text-tertiary);
       font-family: var(--font-mono);
+      position: relative;
+      z-index: 1;
     }
   </style>
 </head>
 <body>
-  <div class="ambient-glow glow-top"></div>
+  <div class="ambient-glow glow-center"></div>
 
   <header class="navbar">
     <div class="nav-container">
-      <a href="/" class="brand">FRUITSHUB</a>
+      <a href="/" class="brand">
+        <span class="brand-badge">F</span>
+        <span>FRUITSHUB</span>
+      </a>
       <span class="nav-tag ${activeKey ? "green" : ""}">
         ${activeKey ? "Key Active" : "Key System"}
       </span>
     </div>
   </header>
 
-  <main class="container">
-    ${activeKey ? `
-      <!-- Active Key Screen -->
-      <div class="card">
-        <h1 class="card-title">Key Active</h1>
-        <p class="card-desc">You already have a valid key for this device (${remainingTimeStr}).</p>
+  <main class="main-wrapper">
+    <div class="container">
+      ${activeKey ? `
+        <!-- Active Key Screen -->
+        <div class="card">
+          <h1 class="card-title">Key Active</h1>
+          <p class="card-desc">You already have a valid key for this device (${remainingTimeStr}).</p>
 
-        <div style="margin-bottom: 24px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <span class="info-label" style="margin-bottom: 0;">Your Key</span>
-            <button class="btn btn-secondary" style="padding: 6px 14px; font-size: 0.78rem;" onclick="copyText('raw-key', this)">Copy Key</button>
-          </div>
-          <div class="code-box" style="margin-bottom: 0; padding: 14px 16px; display: block; word-break: break-all; overflow-wrap: anywhere;">
-            <span id="raw-key" style="font-weight: 600; color: var(--accent-cyan); font-size: 0.88rem; line-height: 1.6; word-break: break-all; overflow-wrap: anywhere; user-select: all; display: block;">${activeKey}</span>
-          </div>
-        </div>
-
-        <div style="margin-bottom: 24px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <span class="info-label" style="margin-bottom: 0;">Roblox Loader</span>
-            <button class="btn btn-primary" style="padding: 6px 16px; font-size: 0.78rem;" onclick="copyText('raw-loader', this)">Copy Loader</button>
-          </div>
-          <div class="code-box" style="margin-bottom: 0; padding: 14px 16px; display: block;">
-            <pre id="raw-loader" style="margin: 0; font-family: var(--font-mono); font-size: 0.82rem; line-height: 1.6; color: #cbd5e1; white-space: pre-wrap; word-break: break-word; user-select: all;">${escapeHtml(loaderCode)}</pre>
-          </div>
-        </div>
-      </div>
-    ` : `
-      <!-- Selection Screen -->
-      <div class="card">
-        <h1 class="card-title">FruitsHub Key System</h1>
-        <p class="card-desc">Complete 3 checkpoints to get your 24-hour key.</p>
-
-        ${hwidParam ? `
-          <span class="info-label">Hardware ID</span>
-          <div class="code-box" style="margin-bottom: 24px;">
-            <span style="font-size: 0.8rem; color: #cbd5e1;">${escapeHtml(hwidParam)}</span>
-          </div>
-        ` : ""}
-
-        <span class="info-label">Choose Provider</span>
-        <div class="provider-grid">
-          <!-- LootLabs -->
-          <a href="/checkpoint/start?provider=lootlabs&hwid=${encodeURIComponent(hwidParam || "DEFAULT_USER")}" class="provider-card">
-            <div>
-              <div class="provider-badge">Recommended</div>
-              <div class="provider-title">LootLabs</div>
-              <div class="provider-sub">3 Quick Checkpoints</div>
+          <div style="margin-bottom: 28px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+              <span class="info-label" style="margin-bottom: 0;">Your Key</span>
+              <button class="btn btn-secondary" style="padding: 8px 18px; font-size: 0.85rem;" onclick="copyText('raw-key', this)">Copy Key</button>
             </div>
-            <div class="btn btn-primary" style="width: 100%; font-size: 0.82rem; padding: 10px;">Get Key via LootLabs</div>
-          </a>
-
-          <!-- Linkvertise -->
-          <a href="/checkpoint/start?provider=linkvertise&hwid=${encodeURIComponent(hwidParam || "DEFAULT_USER")}" class="provider-card">
-            <div>
-              <div class="provider-badge" style="color: var(--text-tertiary);">Alternative</div>
-              <div class="provider-title">Linkvertise</div>
-              <div class="provider-sub">3 Standard Checkpoints</div>
+            <div class="code-box" style="margin-bottom: 0; padding: 18px 22px; display: block; word-break: break-all; overflow-wrap: anywhere;">
+              <span id="raw-key" style="font-weight: 600; color: var(--accent-cyan); font-size: 1rem; line-height: 1.6; word-break: break-all; overflow-wrap: anywhere; user-select: all; display: block;">${activeKey}</span>
             </div>
-            <div class="btn btn-secondary" style="width: 100%; font-size: 0.82rem; padding: 10px;">Get Key via Linkvertise</div>
-          </a>
+          </div>
+
+          <div style="margin-bottom: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+              <span class="info-label" style="margin-bottom: 0;">Roblox Loader</span>
+              <button class="btn btn-primary" style="padding: 8px 20px; font-size: 0.85rem;" onclick="copyText('raw-loader', this)">Copy Loader</button>
+            </div>
+            <div class="code-box" style="margin-bottom: 0; padding: 18px 22px; display: block;">
+              <pre id="raw-loader" style="margin: 0; font-family: var(--font-mono); font-size: 0.92rem; line-height: 1.65; color: #cbd5e1; white-space: pre-wrap; word-break: break-word; user-select: all;">${escapeHtml(loaderCode)}</pre>
+            </div>
+          </div>
         </div>
-      </div>
-    `}
+      ` : `
+        <!-- Selection Screen -->
+        <div class="card">
+          <h1 class="card-title">FruitsHub Key System</h1>
+          <p class="card-desc">Complete 3 checkpoints to get your 24-hour key.</p>
+
+          ${hwidParam ? `
+            <span class="info-label">Hardware ID</span>
+            <div class="code-box" style="margin-bottom: 28px;">
+              <span style="font-size: 0.9rem; color: #cbd5e1;">${escapeHtml(hwidParam)}</span>
+            </div>
+          ` : ""}
+
+          <span class="info-label">Choose Provider</span>
+          <div class="provider-grid">
+            <!-- LootLabs -->
+            <a href="/checkpoint/start?provider=lootlabs&hwid=${encodeURIComponent(hwidParam || "DEFAULT_USER")}" class="provider-card">
+              <div>
+                <span class="provider-badge cyan">Recommended</span>
+                <div class="provider-title">LootLabs</div>
+                <div class="provider-sub">3 Quick Checkpoints</div>
+              </div>
+              <div class="btn btn-primary" style="width: 100%;">Get Key via LootLabs</div>
+            </a>
+
+            <!-- Linkvertise -->
+            <a href="/checkpoint/start?provider=linkvertise&hwid=${encodeURIComponent(hwidParam || "DEFAULT_USER")}" class="provider-card">
+              <div>
+                <span class="provider-badge gray">Alternative</span>
+                <div class="provider-title">Linkvertise</div>
+                <div class="provider-sub">3 Standard Checkpoints</div>
+              </div>
+              <div class="btn btn-secondary" style="width: 100%;">Get Key via Linkvertise</div>
+            </a>
+          </div>
+        </div>
+      `}
+    </div>
   </main>
 
   <footer class="footer">
