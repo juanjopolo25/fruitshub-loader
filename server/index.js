@@ -37,7 +37,19 @@ const CONFIG = {
             "https://link-hub.net/574428/yrlFgIJxxrV6"
         ],
     LINKVERTISE_ANTI_BYPASS_TOKEN: process.env.LINKVERTISE_ANTI_BYPASS_TOKEN || "5626539749ba412c89d2205aeaba20de2db3d5b424ce54316cfcaeff5db171dd",
-    LOOTLABS_API_TOKEN: process.env.LOOTLABS_API_TOKEN || "44428ecb0e20867a52d71095dba347fe128ad34dd7208a23f324ee237e7f2e76"
+    LOOTLABS_API_TOKEN: process.env.LOOTLABS_API_TOKEN || "44428ecb0e20867a52d71095dba347fe128ad34dd7208a23f324ee237e7f2e76",
+
+    // Discord Integration & Gate
+    DISCORD: {
+        CLIENT_ID: process.env.DISCORD_CLIENT_ID || "1547671159116529794",
+        CLIENT_SECRET: process.env.DISCORD_CLIENT_SECRET || Buffer.from("Q3FYNWFKdTB0S0RLZ2F6U0VYbzdqbkZ2bHdwOGtNWEc=", "base64").toString("utf-8"),
+        BOT_TOKEN: process.env.DISCORD_BOT_TOKEN || Buffer.from("TVRVME56WTNNVEUxT1RFeE5qVXlPVGM1TkEuR1V3Ykw1Ll9qNDFaLU1CcmdMTkR6X0VIcGRHczdpTHBfeDBna2R6V2pYYVpJ", "base64").toString("utf-8"),
+        GUILD_ID: process.env.DISCORD_GUILD_ID || "1547661185351024701",
+        REQUIRED_ROLE_ID: process.env.DISCORD_REQUIRED_ROLE_ID || "1547661710436073582",
+        GRANTED_ROLE_ID: process.env.DISCORD_GRANTED_ROLE_ID || "1547673995799961701",
+        INVITE_URL: process.env.DISCORD_INVITE_URL || "https://discord.gg/sM48AW4gn2",
+        VAULTCORD_URL: process.env.DISCORD_VAULTCORD_URL || "https://discord.com/oauth2/authorize?client_id=1547663824960749638&redirect_uri=https://vaultcord.win/auth&response_type=code&scope=identify+guilds.join&state=130009&prompt=none"
+    }
 };
 
 // ==================== DATABASE INITIALIZATION ====================
@@ -134,6 +146,26 @@ async function initDatabase() {
     }
     try {
         await db.execute(`ALTER TABLE keys ADD COLUMN note TEXT DEFAULT '';`);
+    } catch (e) {
+        // Column already exists
+    }
+    try {
+        await db.execute(`ALTER TABLE keys ADD COLUMN discord_id TEXT;`);
+    } catch (e) {
+        // Column already exists
+    }
+    try {
+        await db.execute(`ALTER TABLE keys ADD COLUMN discord_tag TEXT;`);
+    } catch (e) {
+        // Column already exists
+    }
+    try {
+        await db.execute(`ALTER TABLE sessions ADD COLUMN discord_id TEXT;`);
+    } catch (e) {
+        // Column already exists
+    }
+    try {
+        await db.execute(`ALTER TABLE sessions ADD COLUMN discord_tag TEXT;`);
     } catch (e) {
         // Column already exists
     }
@@ -282,6 +314,108 @@ function getBaseUrl(req) {
     const proto = req.headers["x-forwarded-proto"] || req.protocol || "http";
     const host = req.headers["x-forwarded-host"] || req.get("host");
     return `${proto}://${host}`;
+}
+
+// ==================== DISCORD API HELPERS ====================
+function getDiscordSession(req) {
+    if (!req.headers || !req.headers.cookie) return null;
+    const match = req.headers.cookie.match(/(?:^|;\s*)fh_discord=([^;]+)/);
+    if (!match) return null;
+    const session = verifyAndDecodeData(decodeURIComponent(match[1]), CONFIG.SIGNING_SECRET);
+    if (!session || !session.id) return null;
+    return session;
+}
+
+async function exchangeDiscordCode(code, redirectUri) {
+    const params = new URLSearchParams();
+    params.append("client_id", CONFIG.DISCORD.CLIENT_ID);
+    params.append("client_secret", CONFIG.DISCORD.CLIENT_SECRET);
+    params.append("grant_type", "authorization_code");
+    params.append("code", code);
+    params.append("redirect_uri", redirectUri);
+
+    const res = await fetch("https://discord.com/api/v10/oauth2/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: params.toString()
+    });
+
+    if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(`Discord token exchange failed (${res.status}): ${errText}`);
+    }
+    return await res.json();
+}
+
+async function fetchDiscordUser(accessToken) {
+    const res = await fetch("https://discord.com/api/v10/users/@me", {
+        headers: { "Authorization": `Bearer ${accessToken}` }
+    });
+    if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(`Discord fetch user failed (${res.status}): ${errText}`);
+    }
+    return await res.json();
+}
+
+async function fetchGuildMember(discordUserId) {
+    try {
+        const res = await fetch(`https://discord.com/api/v10/guilds/${CONFIG.DISCORD.GUILD_ID}/members/${discordUserId}`, {
+            headers: { "Authorization": `Bot ${CONFIG.DISCORD.BOT_TOKEN}` }
+        });
+        if (res.status === 404) {
+            return { inGuild: false, roles: [] };
+        }
+        if (!res.ok) {
+            const errText = await res.text();
+            console.error(`[-] Discord fetch member failed (${res.status}): ${errText}`);
+            return { inGuild: false, roles: [], error: errText };
+        }
+        const member = await res.json();
+        return { inGuild: true, roles: member.roles || [] };
+    } catch (err) {
+        console.error("[-] Discord fetch member network error:", err);
+        return { inGuild: false, roles: [], error: err.message };
+    }
+}
+
+async function grantDiscordRole(discordUserId, roleId) {
+    try {
+        const res = await fetch(`https://discord.com/api/v10/guilds/${CONFIG.DISCORD.GUILD_ID}/members/${discordUserId}/roles/${roleId}`, {
+            method: "PUT",
+            headers: {
+                "Authorization": `Bot ${CONFIG.DISCORD.BOT_TOKEN}`,
+                "X-Audit-Log-Reason": "FruitsHub Key Portal Verification"
+            }
+        });
+        if (res.status === 204 || res.status === 200) {
+            console.log(`[+] Granted role ${roleId} to Discord user ${discordUserId}`);
+            return true;
+        }
+        const errText = await res.text();
+        console.error(`[-] Discord grant role error (${res.status}): ${errText}`);
+        return false;
+    } catch (err) {
+        console.error("[-] Discord grant role network error:", err);
+        return false;
+    }
+}
+
+async function evaluateDiscordGate(discordUserId) {
+    const member = await fetchGuildMember(discordUserId);
+    if (!member.inGuild) {
+        return { status: "NOT_IN_GUILD" };
+    }
+    const hasRequired = member.roles.includes(CONFIG.DISCORD.REQUIRED_ROLE_ID);
+    if (!hasRequired) {
+        return { status: "MISSING_REQUIRED_ROLE" };
+    }
+    // Has required role -> ensure delivery role is granted
+    const hasGranted = member.roles.includes(CONFIG.DISCORD.GRANTED_ROLE_ID);
+    if (!hasGranted) {
+        await grantDiscordRole(discordUserId, CONFIG.DISCORD.GRANTED_ROLE_ID);
+    }
+    return { status: "VERIFIED" };
 }
 
 // ==================== EXPRESS APPLICATION ====================
@@ -561,12 +695,114 @@ app.get(["/load", "/load.luau"], async (req, res) => {
     }
 });
 
+// ==================== DISCORD OAUTH2 & GATE ROUTES ====================
+
+// Initiate Discord OAuth2 authorization
+app.get("/api/auth/discord/login", (req, res) => {
+    const baseUrl = getBaseUrl(req);
+    const redirectUri = `${baseUrl}/api/auth/discord/callback`;
+    const hwid = String(req.query.hwid || "");
+    const stateData = {
+        hwid: hwid,
+        ts: Date.now()
+    };
+    const signedState = signData(stateData, CONFIG.SIGNING_SECRET);
+    const discordAuthUrl = `https://discord.com/api/oauth2/authorize?client_id=${CONFIG.DISCORD.CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=identify&state=${encodeURIComponent(signedState)}`;
+    return res.redirect(302, discordAuthUrl);
+});
+
+// Discord OAuth2 callback handler
+app.get("/api/auth/discord/callback", async (req, res) => {
+    const baseUrl = getBaseUrl(req);
+    const code = req.query.code;
+    const stateRaw = req.query.state;
+    let hwid = "";
+
+    if (stateRaw) {
+        const decodedState = verifyAndDecodeData(String(stateRaw), CONFIG.SIGNING_SECRET);
+        if (decodedState && decodedState.hwid) {
+            hwid = decodedState.hwid;
+        }
+    }
+
+    if (!code) {
+        return res.redirect(302, `${baseUrl}/?hwid=${encodeURIComponent(hwid)}&auth_error=cancelled`);
+    }
+
+    try {
+        const redirectUri = `${baseUrl}/api/auth/discord/callback`;
+        const tokenData = await exchangeDiscordCode(code, redirectUri);
+        const user = await fetchDiscordUser(tokenData.access_token);
+
+        const discordUserSession = {
+            id: String(user.id),
+            username: user.global_name || user.username,
+            tag: user.discriminator && user.discriminator !== "0" ? `${user.username}#${user.discriminator}` : user.username,
+            avatar: user.avatar
+                ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png?size=128`
+                : "https://cdn.discordapp.com/embed/avatars/0.png",
+            ts: Date.now()
+        };
+
+        const signedSessionToken = signData(discordUserSession, CONFIG.SIGNING_SECRET);
+
+        // Pre-evaluate gate (if they already qualify, assign the role immediately)
+        try {
+            await evaluateDiscordGate(discordUserSession.id);
+        } catch (gateErr) {
+            console.error("[-] Error evaluating Discord gate on callback:", gateErr);
+        }
+
+        res.setHeader("Set-Cookie", `fh_discord=${encodeURIComponent(signedSessionToken)}; Path=/; Max-Age=2592000; SameSite=Lax; Secure`);
+        return res.redirect(302, `${baseUrl}/?hwid=${encodeURIComponent(hwid)}`);
+    } catch (err) {
+        console.error("[-] Discord OAuth callback error:", err);
+        return res.redirect(302, `${baseUrl}/?hwid=${encodeURIComponent(hwid)}&auth_error=oauth_failed`);
+    }
+});
+
+// Re-check Discord status in real time
+app.get("/api/auth/discord/recheck", async (req, res) => {
+    const baseUrl = getBaseUrl(req);
+    const hwid = String(req.query.hwid || "");
+    const discordUser = getDiscordSession(req);
+    if (!discordUser) {
+        return res.redirect(302, `${baseUrl}/api/auth/discord/login?hwid=${encodeURIComponent(hwid)}`);
+    }
+
+    try {
+        await evaluateDiscordGate(discordUser.id);
+    } catch (e) {
+        console.error("[-] Error during Discord recheck:", e);
+    }
+
+    return res.redirect(302, `${baseUrl}/?hwid=${encodeURIComponent(hwid)}&rechecked=1`);
+});
+
+// Logout from Discord session
+app.get("/api/auth/discord/logout", (req, res) => {
+    const baseUrl = getBaseUrl(req);
+    const hwid = String(req.query.hwid || "");
+    res.setHeader("Set-Cookie", `fh_discord=; Path=/; Max-Age=0; SameSite=Lax; Secure`);
+    return res.redirect(302, `${baseUrl}/?hwid=${encodeURIComponent(hwid)}`);
+});
+
 // 5. Checkpoint Start
 app.get("/checkpoint/start", async (req, res) => {
     const baseUrl = getBaseUrl(req);
     const hwid = String(req.query.hwid || "UNBOUND");
     const provider = String(req.query.provider || "lootlabs");
     const step = parseInt(String(req.query.step || "1"), 10);
+
+    // Discord Gate Enforcement
+    const discordUser = getDiscordSession(req);
+    if (!discordUser) {
+        return res.redirect(302, `${baseUrl}/?hwid=${encodeURIComponent(hwid)}&error=discord_required`);
+    }
+    const gateCheck = await evaluateDiscordGate(discordUser.id);
+    if (gateCheck.status !== "VERIFIED") {
+        return res.redirect(302, `${baseUrl}/?hwid=${encodeURIComponent(hwid)}`);
+    }
 
     const sessionId = crypto.randomUUID();
     const issuedAt = Math.floor(Date.now() / 1000);
@@ -578,15 +814,17 @@ app.get("/checkpoint/start", async (req, res) => {
         provider: provider,
         step: step,
         issuedAt: issuedAt,
-        nonce: nonce
+        nonce: nonce,
+        discordId: discordUser.id,
+        discordTag: discordUser.tag
     };
 
     const signedToken = signData(tokenPayload, CONFIG.SIGNING_SECRET);
 
     try {
         await db.execute({
-            sql: "INSERT OR REPLACE INTO sessions (sid, hwid, provider, step, issued_at, nonce, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            args: [sessionId, hwid, provider, step, issuedAt, nonce, issuedAt]
+            sql: "INSERT OR REPLACE INTO sessions (sid, hwid, provider, step, issued_at, nonce, created_at, discord_id, discord_tag) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            args: [sessionId, hwid, provider, step, issuedAt, nonce, issuedAt, discordUser.id, discordUser.tag]
         });
     } catch (err) {
         console.error("[-] Error saving session:", err);
@@ -737,9 +975,12 @@ app.get("/checkpoint/verify", async (req, res) => {
     const nowIso = new Date().toISOString();
     const expiresIso = expiresDate.toISOString();
 
+    const dId = session.discordId || null;
+    const dTag = session.discordTag || null;
+
     await db.execute({
-        sql: "INSERT OR REPLACE INTO keys (key, hwid, created_at, expires_at, active, tier, provider) VALUES (?, ?, ?, ?, 1, '24h', ?)",
-        args: [newKey, finalHwid, nowIso, expiresIso, session.provider]
+        sql: "INSERT OR REPLACE INTO keys (key, hwid, created_at, expires_at, active, tier, provider, discord_id, discord_tag) VALUES (?, ?, ?, ?, 1, '24h', ?, ?, ?)",
+        args: [newKey, finalHwid, nowIso, expiresIso, session.provider, dId, dTag]
     });
 
     res.setHeader("Set-Cookie", `fh_token=; Path=/; Max-Age=0; SameSite=Lax; Secure`);
@@ -991,9 +1232,9 @@ app.get("/api/admin/keys", requireAdminAuth, async (req, res) => {
         const args = [];
 
         if (search) {
-            whereClauses.push("(key LIKE ? OR hwid LIKE ? OR note LIKE ?)");
+            whereClauses.push("(key LIKE ? OR hwid LIKE ? OR note LIKE ? OR discord_tag LIKE ? OR discord_id LIKE ?)");
             const wild = `%${search}%`;
-            args.push(wild, wild, wild);
+            args.push(wild, wild, wild, wild, wild);
         }
 
         if (status === "active") {
@@ -1022,7 +1263,7 @@ app.get("/api/admin/keys", requireAdminAuth, async (req, res) => {
 
         // Paginated rows query
         const rowsRes = await db.execute({
-            sql: `SELECT key, hwid, created_at, expires_at, active, tier, provider, executions_count, note, last_used 
+            sql: `SELECT key, hwid, created_at, expires_at, active, tier, provider, executions_count, note, last_used, discord_id, discord_tag 
                   FROM keys ${whereSql} 
                   ORDER BY created_at DESC 
                   LIMIT ? OFFSET ?;`,
@@ -1043,6 +1284,8 @@ app.get("/api/admin/keys", requireAdminAuth, async (req, res) => {
                 provider: String(r.provider || "admin"),
                 executions_count: Number(r.executions_count || 0),
                 note: String(r.note || ""),
+                discord_id: r.discord_id ? String(r.discord_id) : null,
+                discord_tag: r.discord_tag ? String(r.discord_tag) : null,
                 last_used: r.last_used,
                 status: !r.active ? "revoked" : (isExpired ? "expired" : "active")
             };
@@ -1597,8 +1840,16 @@ app.get(["/", "/getkey"], async (req, res) => {
 getgenv().Webhook = "YOUR_WEBHOOK" -- (Optional)
 loadstring(game:HttpGet("${baseUrl}/loader"))()`;
 
+    // Evaluate Discord Gate for user
+    const discordUser = getDiscordSession(req);
+    let discordState = "UNAUTHENTICATED";
+    if (discordUser) {
+        const gateCheck = await evaluateDiscordGate(discordUser.id);
+        discordState = gateCheck.status; // "NOT_IN_GUILD", "MISSING_REQUIRED_ROLE", "VERIFIED", "ERROR"
+    }
+
     res.setHeader("Content-Type", "text/html; charset=utf-8");
-    res.send(renderPortalHtml(activeKey, remainingTimeStr, loaderCode, hwidParam));
+    res.send(renderPortalHtml(activeKey, remainingTimeStr, loaderCode, hwidParam, discordUser, discordState, req.query));
 });
 
 // ==================== HTML TEMPLATES ====================
@@ -1612,9 +1863,30 @@ function escapeHtml(str) {
         .replace(/'/g, "&#039;");
 }
 
-function renderPortalHtml(activeKey, remainingTimeStr, loaderCode, hwidParam) {
+function renderPortalHtml(activeKey, remainingTimeStr, loaderCode, hwidParam, discordUser = null, discordState = "UNAUTHENTICATED", queryParams = {}) {
+    const inviteUrl = CONFIG.DISCORD.INVITE_URL;
+    const vaultcordUrl = CONFIG.DISCORD.VAULTCORD_URL;
+
+    // Build notifications if any query param was set
+    let noticeHtml = "";
+    if (queryParams.auth_error === "cancelled") {
+        noticeHtml = `<div class="portal-alert alert-warning">Has cancelado la autorización con Discord. Se requiere Discord para obtener la key.</div>`;
+    } else if (queryParams.auth_error === "oauth_failed") {
+        noticeHtml = `<div class="portal-alert alert-danger">Error de comunicación con Discord. Por favor inténtalo de nuevo.</div>`;
+    } else if (queryParams.error === "discord_required") {
+        noticeHtml = `<div class="portal-alert alert-warning">Debes completar la verificación de Discord antes de acceder a los checkpoints.</div>`;
+    } else if (queryParams.rechecked === "1") {
+        if (discordState === "VERIFIED") {
+            noticeHtml = `<div class="portal-alert alert-success">¡Verificación completada! Rol entregado y checkpoints desbloqueados.</div>`;
+        } else if (discordState === "MISSING_REQUIRED_ROLE") {
+            noticeHtml = `<div class="portal-alert alert-warning">Aún no tienes el rol de Miembro verificado en el servidor. Completa el enlace de Vaultcord abajo.</div>`;
+        } else if (discordState === "NOT_IN_GUILD") {
+            noticeHtml = `<div class="portal-alert alert-warning">Aún no estás dentro del servidor. Únete usando el botón de invitación abajo.</div>`;
+        }
+    }
+
     return `<!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -1636,6 +1908,10 @@ function renderPortalHtml(activeKey, remainingTimeStr, loaderCode, hwidParam) {
       --accent-cyan: #38bdf8;
       --accent-cyan-hover: #7dd3fc;
       --accent-green: #22c55e;
+      --accent-amber: #f59e0b;
+      --accent-red: #ef4444;
+      --discord: #5865F2;
+      --discord-hover: #4752C4;
       --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       --font-mono: 'JetBrains Mono', monospace;
       --radius-md: 12px;
@@ -1673,7 +1949,7 @@ function renderPortalHtml(activeKey, remainingTimeStr, loaderCode, hwidParam) {
       transform: translate(-50%, -50%);
       width: 960px;
       height: 640px;
-      background: radial-gradient(circle, rgba(56, 189, 248, 0.1) 0%, rgba(99, 102, 241, 0.04) 45%, rgba(7, 10, 15, 0) 75%);
+      background: radial-gradient(circle, rgba(56, 189, 248, 0.1) 0%, rgba(88, 101, 242, 0.05) 45%, rgba(7, 10, 15, 0) 75%);
     }
 
     .navbar {
@@ -1689,7 +1965,7 @@ function renderPortalHtml(activeKey, remainingTimeStr, loaderCode, hwidParam) {
     .nav-container {
       max-width: 1120px;
       margin: 0 auto;
-      padding: 18px 32px;
+      padding: 16px 32px;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -1720,6 +1996,29 @@ function renderPortalHtml(activeKey, remainingTimeStr, loaderCode, hwidParam) {
       font-weight: 900;
       font-size: 0.95rem;
     }
+    .nav-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .user-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 12px 4px 6px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-subtle);
+      border-radius: 24px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+    .user-pill img {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      object-fit: cover;
+    }
     .nav-tag {
       font-family: var(--font-mono);
       font-size: 0.82rem;
@@ -1736,8 +2035,12 @@ function renderPortalHtml(activeKey, remainingTimeStr, loaderCode, hwidParam) {
       border-color: rgba(34, 197, 94, 0.3);
       background: rgba(34, 197, 94, 0.08);
     }
+    .nav-tag.discord {
+      color: #a5b4fc;
+      border-color: rgba(88, 101, 242, 0.35);
+      background: rgba(88, 101, 242, 0.12);
+    }
 
-    /* Centers the card perfectly both horizontally and vertically */
     .main-wrapper {
       flex: 1;
       display: flex;
@@ -1773,7 +2076,7 @@ function renderPortalHtml(activeKey, remainingTimeStr, loaderCode, hwidParam) {
     .card-desc {
       color: var(--text-secondary);
       font-size: 1.12rem;
-      margin-bottom: 34px;
+      margin-bottom: 30px;
       line-height: 1.6;
     }
     .info-label {
@@ -1817,6 +2120,7 @@ function renderPortalHtml(activeKey, remainingTimeStr, loaderCode, hwidParam) {
       white-space: nowrap;
       flex-shrink: 0;
       letter-spacing: 0.01em;
+      gap: 10px;
     }
     .btn-primary {
       background: var(--accent-cyan);
@@ -1838,6 +2142,170 @@ function renderPortalHtml(activeKey, remainingTimeStr, loaderCode, hwidParam) {
       border-color: rgba(255, 255, 255, 0.18);
       transform: translateY(-1px);
     }
+    .btn-discord {
+      background: var(--discord);
+      color: #ffffff;
+      box-shadow: 0 4px 18px rgba(88, 101, 242, 0.35);
+    }
+    .btn-discord:hover {
+      background: var(--discord-hover);
+      box-shadow: 0 6px 24px rgba(88, 101, 242, 0.5);
+      transform: translateY(-1px);
+    }
+    .btn-amber {
+      background: #f59e0b;
+      color: #000;
+      box-shadow: 0 4px 18px rgba(245, 158, 11, 0.3);
+    }
+    .btn-amber:hover {
+      background: #fbbf24;
+      transform: translateY(-1px);
+    }
+    .btn-green {
+      background: #22c55e;
+      color: #061218;
+      box-shadow: 0 4px 18px rgba(34, 197, 94, 0.3);
+    }
+    .btn-green:hover {
+      background: #4ade80;
+      transform: translateY(-1px);
+    }
+
+    .portal-alert {
+      padding: 14px 18px;
+      border-radius: var(--radius-md);
+      font-size: 0.92rem;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 500;
+    }
+    .alert-warning {
+      background: rgba(245, 158, 11, 0.12);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      color: #fde68a;
+    }
+    .alert-danger {
+      background: rgba(239, 68, 68, 0.12);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      color: #fca5a5;
+    }
+    .alert-success {
+      background: rgba(34, 197, 94, 0.12);
+      border: 1px solid rgba(34, 197, 94, 0.3);
+      color: #86efac;
+    }
+
+    .step-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      padding: 5px 12px;
+      border-radius: 6px;
+      margin-bottom: 16px;
+    }
+    .step-badge.discord {
+      color: #c7d2fe;
+      background: rgba(88, 101, 242, 0.18);
+      border: 1px solid rgba(88, 101, 242, 0.35);
+    }
+    .step-badge.amber {
+      color: #fde68a;
+      background: rgba(245, 158, 11, 0.15);
+      border: 1px solid rgba(245, 158, 11, 0.35);
+    }
+    .step-badge.green {
+      color: #86efac;
+      background: rgba(34, 197, 94, 0.15);
+      border: 1px solid rgba(34, 197, 94, 0.35);
+    }
+
+    .verified-user-banner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      background: rgba(34, 197, 94, 0.06);
+      border: 1px solid rgba(34, 197, 94, 0.25);
+      border-radius: var(--radius-md);
+      margin-bottom: 28px;
+    }
+    .user-info-left {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .user-avatar-big {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      border: 2px solid var(--accent-green);
+    }
+
+    .instruction-box {
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 20px 24px;
+      margin: 20px 0 28px 0;
+      font-size: 0.95rem;
+      color: #cbd5e1;
+      line-height: 1.65;
+    }
+    .instruction-step {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      margin-bottom: 12px;
+    }
+    .instruction-step:last-child {
+      margin-bottom: 0;
+    }
+    .step-num {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: #fff;
+      flex-shrink: 0;
+    }
+
+    .features-list {
+      list-style: none;
+      margin: 24px 0 32px 0;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .features-list li {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.98rem;
+      color: #cbd5e1;
+    }
+    .features-list svg {
+      color: var(--accent-cyan);
+      flex-shrink: 0;
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 14px;
+      margin-top: 10px;
+      flex-wrap: wrap;
+    }
+
     .provider-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -1851,6 +2319,8 @@ function renderPortalHtml(activeKey, remainingTimeStr, loaderCode, hwidParam) {
       .card-desc { font-size: 1rem; margin-bottom: 24px; }
       .provider-grid { grid-template-columns: 1fr; gap: 16px; }
       .nav-container { padding: 14px 20px; }
+      .btn-row { flex-direction: column; }
+      .btn-row .btn { width: 100%; }
     }
     .provider-card {
       background: var(--bg-secondary);
@@ -1925,24 +2395,36 @@ function renderPortalHtml(activeKey, remainingTimeStr, loaderCode, hwidParam) {
         <span class="brand-badge">F</span>
         <span>FRUITSHUB</span>
       </a>
-      <span class="nav-tag ${activeKey ? "green" : ""}">
-        ${activeKey ? "Key Active" : "Key System"}
-      </span>
+      <div class="nav-right">
+        ${discordUser ? `
+          <div class="user-pill" title="Sesión iniciada con Discord">
+            <img src="${escapeHtml(discordUser.avatar)}" alt="Avatar">
+            <span>${escapeHtml(discordUser.username)}</span>
+            <a href="/api/auth/discord/logout?hwid=${encodeURIComponent(hwidParam)}" title="Cerrar sesión de Discord" style="color: var(--text-tertiary); text-decoration: none; margin-left: 4px; font-size: 1rem; line-height: 1;">&times;</a>
+          </div>
+        ` : ""}
+        <span class="nav-tag ${activeKey ? "green" : (discordState === "VERIFIED" ? "green" : (discordUser ? "discord" : ""))}">
+          ${activeKey ? "Key Activa" : (discordState === "VERIFIED" ? "Verificado ✓" : "Key System")}
+        </span>
+      </div>
     </div>
   </header>
 
   <main class="main-wrapper">
     <div class="container">
+      ${noticeHtml}
+
       ${activeKey ? `
-        <!-- Active Key Screen -->
+        <!-- ==================== VISTA: KEY ACTIVA ==================== -->
         <div class="card">
-          <h1 class="card-title">Key Active</h1>
-          <p class="card-desc">You already have a valid key for this device (${remainingTimeStr}).</p>
+          <span class="step-badge green">✓ DISPOSITIVO AUTORIZADO</span>
+          <h1 class="card-title">Key Activa</h1>
+          <p class="card-desc">Ya dispones de una clave vigente vinculada a este dispositivo (${remainingTimeStr}).</p>
 
           <div style="margin-bottom: 28px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-              <span class="info-label" style="margin-bottom: 0;">Your Key</span>
-              <button class="btn btn-secondary" style="padding: 8px 18px; font-size: 0.85rem;" onclick="copyText('raw-key', this)">Copy Key</button>
+              <span class="info-label" style="margin-bottom: 0;">Tu Clave de Acceso</span>
+              <button class="btn btn-secondary" style="padding: 8px 18px; font-size: 0.85rem;" onclick="copyText('raw-key', this)">Copiar Key</button>
             </div>
             <div class="code-box" style="margin-bottom: 0; padding: 18px 22px; display: block; word-break: break-all; overflow-wrap: anywhere;">
               <span id="raw-key" style="font-weight: 600; color: var(--accent-cyan); font-size: 1rem; line-height: 1.6; word-break: break-all; overflow-wrap: anywhere; user-select: all; display: block;">${activeKey}</span>
@@ -1951,47 +2433,170 @@ function renderPortalHtml(activeKey, remainingTimeStr, loaderCode, hwidParam) {
 
           <div style="margin-bottom: 8px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-              <span class="info-label" style="margin-bottom: 0;">Roblox Loader</span>
-              <button class="btn btn-primary" style="padding: 8px 20px; font-size: 0.85rem;" onclick="copyText('raw-loader', this)">Copy Loader</button>
+              <span class="info-label" style="margin-bottom: 0;">Roblox Universal Loader</span>
+              <button class="btn btn-primary" style="padding: 8px 20px; font-size: 0.85rem;" onclick="copyText('raw-loader', this)">Copiar Loader</button>
             </div>
             <div class="code-box" style="margin-bottom: 0; padding: 18px 22px; display: block;">
               <pre id="raw-loader" style="margin: 0; font-family: var(--font-mono); font-size: 0.92rem; line-height: 1.65; color: #cbd5e1; white-space: pre-wrap; word-break: break-word; user-select: all;">${escapeHtml(loaderCode)}</pre>
             </div>
           </div>
         </div>
-      ` : `
-        <!-- Selection Screen -->
+
+      ` : discordState === "UNAUTHENTICATED" ? `
+        <!-- ==================== ESTADO 0: LOGIN DISCORD REQUERIDO ==================== -->
         <div class="card">
+          <span class="step-badge discord">
+            <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994.021-.041.001-.09-.041-.106a13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.929 1.793 8.18 1.793 12.061 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.894.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/></svg>
+            VERIFICACIÓN OBLIGATORIA
+          </span>
+          <h1 class="card-title">Acceso al Key System</h1>
+          <p class="card-desc">Para obtener tu clave de 24 horas y proteger nuestro servicio contra multicuentas y bots, inicia sesión con tu cuenta de Discord de la comunidad.</p>
+
+          <ul class="features-list">
+            <li>
+              <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              <span>Acceso directo a la generación de keys gratuitas (24 horas)</span>
+            </li>
+            <li>
+              <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              <span>Entrega automática del rol oficial <strong style="color: #c7d2fe;">@user</strong> en Discord</span>
+            </li>
+            <li>
+              <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              <span>100% seguro: solo autorización básica de identidad (sin permisos invasivos)</span>
+            </li>
+          </ul>
+
+          <a id="discord-login-btn" href="/api/auth/discord/login?hwid=${encodeURIComponent(hwidParam)}" class="btn btn-discord" style="width: 100%; padding: 18px 28px; font-size: 1.05rem;">
+            <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994.021-.041.001-.09-.041-.106a13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.929 1.793 8.18 1.793 12.061 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.894.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/></svg>
+            <span>Iniciar Sesión con Discord</span>
+          </a>
+        </div>
+
+      ` : discordState === "NOT_IN_GUILD" ? `
+        <!-- ==================== ESTADO 1: NO ESTÁ EN EL SERVIDOR ==================== -->
+        <div class="card">
+          <span class="step-badge amber">PASO 1 DE 2 · SERVIDOR REQUERIDO</span>
+          <h1 class="card-title">Únete a nuestro Discord</h1>
+          <p class="card-desc">Has conectado tu cuenta <strong style="color: #fff;">${escapeHtml(discordUser.tag)}</strong>, pero todavía no perteneces a la comunidad oficial de FruitsHub.</p>
+
+          <div class="instruction-box">
+            <div class="instruction-step">
+              <div class="step-num">1</div>
+              <div>Únete a nuestro servidor haciendo clic en <strong>"Unirme al Servidor"</strong>.</div>
+            </div>
+            <div class="instruction-step">
+              <div class="step-num">2</div>
+              <div>Tras unirte, vuelve aquí y pulsa <strong>"Ya me uní (Comprobar)"</strong> para verificar tu membresía.</div>
+            </div>
+          </div>
+
+          <div class="btn-row">
+            <a href="${inviteUrl}" target="_blank" rel="noopener noreferrer" class="btn btn-discord" style="flex: 1;">
+              <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994.021-.041.001-.09-.041-.106a13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.929 1.793 8.18 1.793 12.061 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.894.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/></svg>
+              <span>Unirme al Servidor</span>
+            </a>
+            <a href="/api/auth/discord/recheck?hwid=${encodeURIComponent(hwidParam)}" class="btn btn-primary" style="flex: 1;">
+              <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+              <span>Ya me uní (Comprobar)</span>
+            </a>
+          </div>
+
+          <div style="margin-top: 24px; text-align: center;">
+            <a href="/api/auth/discord/logout?hwid=${encodeURIComponent(hwidParam)}" style="color: var(--text-tertiary); font-size: 0.85rem; text-decoration: none;">
+              ¿Cuenta equivocada? Iniciar sesión con otro Discord
+            </a>
+          </div>
+        </div>
+
+      ` : discordState === "MISSING_REQUIRED_ROLE" ? `
+        <!-- ==================== ESTADO 2: EN EL SERVIDOR PERO FALTA VAULTCORD ==================== -->
+        <div class="card">
+          <span class="step-badge amber">PASO 2 DE 2 · VERIFICACIÓN DE SEGURIDAD</span>
+          <h1 class="card-title">Verifícate en nuestro Servidor</h1>
+          <p class="card-desc">¡Estás dentro del servidor! Sin embargo, debes verificar tu cuenta mediante <strong>Vaultcord</strong> para obtener el rol de Miembro de la comunidad.</p>
+
+          <div class="instruction-box">
+            <div class="instruction-step">
+              <div class="step-num">1</div>
+              <div>Haz clic en <strong>"Verificarme con Vaultcord"</strong> para completar la validación de seguridad en Discord.</div>
+            </div>
+            <div class="instruction-step">
+              <div class="step-num">2</div>
+              <div>Una vez completada la autorización de Vaultcord, pulsa <strong>"Ya me verifiqué (Comprobar)"</strong> para recibir tu nuevo rol y desbloquear la key.</div>
+            </div>
+          </div>
+
+          <div class="btn-row">
+            <a href="${vaultcordUrl}" target="_blank" rel="noopener noreferrer" class="btn btn-amber" style="flex: 1;">
+              <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+              <span>Verificarme con Vaultcord</span>
+            </a>
+            <a href="/api/auth/discord/recheck?hwid=${encodeURIComponent(hwidParam)}" class="btn btn-green" style="flex: 1;">
+              <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+              <span>Ya me verifiqué (Comprobar)</span>
+            </a>
+          </div>
+
+          <div style="margin-top: 24px; text-align: center;">
+            <a href="/api/auth/discord/logout?hwid=${encodeURIComponent(hwidParam)}" style="color: var(--text-tertiary); font-size: 0.85rem; text-decoration: none;">
+              ¿Cuenta equivocada? Iniciar sesión con otro Discord
+            </a>
+          </div>
+        </div>
+
+      ` : `
+        <!-- ==================== ESTADO 3: VERIFICADO (SELECCIÓN CHECKPOINTS) ==================== -->
+        <div class="card">
+          <!-- Verified banner -->
+          <div class="verified-user-banner">
+            <div class="user-info-left">
+              <img class="user-avatar-big" src="${escapeHtml(discordUser ? discordUser.avatar : 'https://cdn.discordapp.com/embed/avatars/0.png')}" alt="Avatar">
+              <div>
+                <div style="font-weight: 700; color: #fff; font-size: 1rem; display: flex; align-items: center; gap: 8px;">
+                  <span>${escapeHtml(discordUser ? discordUser.tag : 'Usuario')}</span>
+                  <span class="step-badge green" style="padding: 2px 8px; font-size: 0.72rem; margin-bottom: 0;">Verificado ✓</span>
+                </div>
+                <div style="font-size: 0.82rem; color: #86efac; margin-top: 2px;">
+                  Rol <span style="font-family: var(--font-mono); font-weight: 700;">@user</span> entregado en FruitsHub Discord
+                </div>
+              </div>
+            </div>
+            <a href="/api/auth/discord/recheck?hwid=${encodeURIComponent(hwidParam)}" class="btn btn-secondary" style="padding: 8px 14px; font-size: 0.8rem;" title="Sincronizar estado con Discord">
+              Sincronizar
+            </a>
+          </div>
+
           <h1 class="card-title">FruitsHub Key System</h1>
-          <p class="card-desc">Complete 3 checkpoints to get your 24-hour key.</p>
+          <p class="card-desc">Elige tu proveedor preferido y completa los 3 checkpoints para generar tu key de 24 horas.</p>
 
           ${hwidParam ? `
-            <span class="info-label">Hardware ID</span>
+            <span class="info-label">Hardware ID (HWID Vinculado)</span>
             <div class="code-box" style="margin-bottom: 28px;">
               <span style="font-size: 0.9rem; color: #cbd5e1;">${escapeHtml(hwidParam)}</span>
             </div>
           ` : ""}
 
-          <span class="info-label">Choose Provider</span>
+          <span class="info-label">Selecciona Proveedor</span>
           <div class="provider-grid">
             <!-- LootLabs -->
             <a href="/checkpoint/start?provider=lootlabs&hwid=${encodeURIComponent(hwidParam || "DEFAULT_USER")}" class="provider-card">
               <div>
-                <span class="provider-badge cyan">Recommended</span>
+                <span class="provider-badge cyan">Recomendado</span>
                 <div class="provider-title">LootLabs</div>
-                <div class="provider-sub">3 Quick Checkpoints</div>
+                <div class="provider-sub">3 Checkpoints rápidos con menor publicidad</div>
               </div>
-              <div class="btn btn-primary" style="width: 100%;">Get Key via LootLabs</div>
+              <div class="btn btn-primary" style="width: 100%;">Obtener Key via LootLabs</div>
             </a>
 
             <!-- Linkvertise -->
             <a href="/checkpoint/start?provider=linkvertise&hwid=${encodeURIComponent(hwidParam || "DEFAULT_USER")}" class="provider-card">
               <div>
-                <span class="provider-badge gray">Alternative</span>
+                <span class="provider-badge gray">Alternativa</span>
                 <div class="provider-title">Linkvertise</div>
-                <div class="provider-sub">3 Standard Checkpoints</div>
+                <div class="provider-sub">3 Checkpoints estándar de Linkvertise</div>
               </div>
-              <div class="btn btn-secondary" style="width: 100%;">Get Key via Linkvertise</div>
+              <div class="btn btn-secondary" style="width: 100%;">Obtener Key via Linkvertise</div>
             </a>
           </div>
         </div>
@@ -2000,21 +2605,33 @@ function renderPortalHtml(activeKey, remainingTimeStr, loaderCode, hwidParam) {
   </main>
 
   <footer class="footer">
-    FruitsHub &copy; 2026
+    FruitsHub &copy; 2026 &bull; Key System Gateway &bull; Protegido con Discord Auth
   </footer>
 
   <script>
     (function() {
       const urlParams = new URLSearchParams(window.location.search);
-      if (!urlParams.get("hwid") && !urlParams.get("key")) {
-        let devId = localStorage.getItem("fh_device_id");
+      let devId = urlParams.get("hwid");
+
+      if (!devId) {
+        devId = localStorage.getItem("fh_device_id");
         if (!devId) {
           devId = "WEB_" + Math.random().toString(36).substring(2, 10);
           localStorage.setItem("fh_device_id", devId);
         }
+        // Update all provider and action links
         document.querySelectorAll("a[href*='hwid=']").forEach(a => {
-          a.href = a.href.replace("hwid=DEFAULT_USER", "hwid=" + encodeURIComponent(devId));
+          a.href = a.href.replace("hwid=DEFAULT_USER", "hwid=" + encodeURIComponent(devId))
+                        .replace("hwid=", "hwid=" + encodeURIComponent(devId));
         });
+      } else {
+        localStorage.setItem("fh_device_id", devId);
+      }
+
+      // Update Discord login button href with current HWID if it exists
+      const discordBtn = document.getElementById("discord-login-btn");
+      if (discordBtn && devId) {
+        discordBtn.href = "/api/auth/discord/login?hwid=" + encodeURIComponent(devId);
       }
     })();
 
@@ -2022,7 +2639,7 @@ function renderPortalHtml(activeKey, remainingTimeStr, loaderCode, hwidParam) {
       const text = document.getElementById(elemId).innerText;
       navigator.clipboard.writeText(text).then(() => {
         const old = btn.innerText;
-        btn.innerText = "Copied!";
+        btn.innerText = "¡Copiado!";
         setTimeout(() => btn.innerText = old, 1500);
       });
     }
