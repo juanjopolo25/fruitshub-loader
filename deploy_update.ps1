@@ -21,7 +21,7 @@ if ([string]::IsNullOrWhiteSpace($ServerUrl)) {
 $ServerUrl = $ServerUrl.TrimEnd('/')
 
 if ([string]::IsNullOrWhiteSpace($AdminSecret)) {
-    $AdminSecret = if ($env:FRUITSHUB_ADMIN_SECRET) { $env:FRUITSHUB_ADMIN_SECRET } else { "FH_ADMIN_ROOT_SECRET_2026" }
+    $AdminSecret = if ($env:FRUITSHUB_ADMIN_SECRET) { $env:FRUITSHUB_ADMIN_SECRET } else { "Juanjonosoy0//////" }
 }
 
 Write-Host "========================================================" -ForegroundColor Cyan

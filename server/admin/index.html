@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FruitsHub — Admin Console</title>
+  <meta name="description" content="FruitsHub Private Master Administration & Analytics Console">
+  <meta name="theme-color" content="#07090e">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+
+  <!-- Ambient background glow elements -->
+  <div class="glow-sphere glow-top-left"></div>
+  <div class="glow-sphere glow-top-right"></div>
+
+  <!-- ==================== LOGIN GATE OVERLAY ==================== -->
+  <div id="login-overlay" class="login-overlay">
+    <div class="login-card">
+      <div class="login-badge">SEGURIDAD RESTRINGIDA</div>
+      <h1 class="login-title">FruitsHub Admin</h1>
+      <p class="login-subtitle">Introduce tu clave secreta de administración para acceder a la consola.</p>
+      
+      <form id="form-login" class="login-form">
+        <div class="form-group">
+          <label for="input-admin-secret" class="form-label">ADMIN SECRET</label>
+          <div class="password-wrap">
+            <input 
+              type="password" 
+              id="input-admin-secret" 
+              class="form-input" 
+              placeholder="Introduce ADMIN_SECRET..." 
+              autocomplete="current-password" 
+              required
+              autofocus
+            >
+            <button type="button" id="btn-toggle-secret" class="btn-input-icon" title="Mostrar/Ocultar clave">👁️</button>
+          </div>
+        </div>
+        <div id="login-error" class="alert-box alert-error hidden"></div>
+        <button type="submit" id="btn-login-submit" class="btn btn-primary btn-block">
+          <span class="btn-text">Desbloquear Consola</span>
+          <span class="btn-spinner hidden"></span>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==================== MAIN ADMIN DASHBOARD ==================== -->
+  <div id="admin-app" class="admin-app hidden">
+
+    <!-- Top Navigation Header -->
+    <header class="admin-header">
+      <div class="header-container">
+        <div class="header-brand">
+          <span class="brand-badge">PRO</span>
+          <span class="brand-name">FRUITSHUB</span>
+          <span class="brand-divider">/</span>
+          <span class="brand-section">ADMIN CONSOLE</span>
+        </div>
+
+        <div class="header-controls">
+          <!-- Live Status Indicator -->
+          <div class="status-chip" id="server-status-chip">
+            <span class="status-pulse-dot"></span>
+            <span id="server-status-text">Conectado</span>
+          </div>
+
+          <!-- Global Maintenance Switch -->
+          <div class="maintenance-toggle-wrap" title="Activar/Desactivar modo mantenimiento para Roblox">
+            <span class="maint-label">Mantenimiento:</span>
+            <button id="btn-toggle-maintenance" class="btn-switch" data-active="false">
+              <span class="switch-ball"></span>
+            </button>
+            <span id="maint-status-badge" class="badge-maint off">OFF</span>
+          </div>
+
+          <!-- Quick Refresh -->
+          <button id="btn-manual-refresh" class="btn btn-icon-secondary" title="Actualizar datos ahora">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+          </button>
+
+          <!-- Logout Button -->
+          <button id="btn-logout" class="btn btn-danger-ghost btn-sm">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+            <span>Salir</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <nav class="nav-tabs-bar">
+      <div class="tabs-container">
+        <button class="nav-tab active" data-tab="tab-overview">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9"></rect><rect x="14" y="3" width="7" height="5"></rect><rect x="14" y="12" width="7" height="9"></rect><rect x="3" y="16" width="7" height="5"></rect></svg>
+          <span>Métricas & Resumen</span>
+        </button>
+
+        <button class="nav-tab" data-tab="tab-keys">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2l-2 2m-1-1l-2 2m-7 7l7-7 4 4-7 7-4-4z"></path><circle cx="7.5" cy="16.5" r="4.5"></circle></svg>
+          <span>Gestión de Keys</span>
+          <span class="tab-badge" id="badge-total-keys">0</span>
+        </button>
+
+        <button class="nav-tab" data-tab="tab-executors">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10"></path><path d="M12 20V4"></path><path d="M6 20v-6"></path></svg>
+          <span>Analítica de Ejecutores</span>
+        </button>
+
+        <button class="nav-tab" data-tab="tab-logs">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+          <span>Registro en Vivo</span>
+        </button>
+      </div>
+    </nav>
+
+    <!-- Main Views Container -->
+    <main class="admin-main">
+
+      <!-- ==================== TAB 1: OVERVIEW ==================== -->
+      <section id="tab-overview" class="tab-panel active animate-fade">
+        <!-- 4 KPI Cards -->
+        <div class="kpi-grid">
+          <div class="kpi-card">
+            <div class="kpi-icon-box cyan">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2l-2 2m-1-1l-2 2m-7 7l7-7 4 4-7 7-4-4z"></path><circle cx="7.5" cy="16.5" r="4.5"></circle></svg>
+            </div>
+            <div class="kpi-details">
+              <span class="kpi-label">Keys Totales</span>
+              <div class="kpi-value" id="kpi-total-keys">--</div>
+              <span class="kpi-subtext" id="kpi-keys-sub">Cargando datos...</span>
+            </div>
+          </div>
+
+          <div class="kpi-card">
+            <div class="kpi-icon-box green">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            </div>
+            <div class="kpi-details">
+              <span class="kpi-label">Keys Activas</span>
+              <div class="kpi-value green" id="kpi-active-keys">--</div>
+              <span class="kpi-subtext" id="kpi-active-sub">Válidas ahora mismo</span>
+            </div>
+          </div>
+
+          <div class="kpi-card">
+            <div class="kpi-icon-box purple">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+            </div>
+            <div class="kpi-details">
+              <span class="kpi-label">Ejecuciones Hoy (24h)</span>
+              <div class="kpi-value purple" id="kpi-today-execs">--</div>
+              <span class="kpi-subtext">Cargas en últimas 24h</span>
+            </div>
+          </div>
+
+          <div class="kpi-card">
+            <div class="kpi-icon-box amber">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path></svg>
+            </div>
+            <div class="kpi-details">
+              <span class="kpi-label">Total Ejecuciones Históricas</span>
+              <div class="kpi-value amber" id="kpi-total-execs">--</div>
+              <span class="kpi-subtext">Todas las cargas acumuladas</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Split Grid: Top Executors & Quick Actions -->
+        <div class="overview-split-grid">
+          <!-- Top Executors Ranking Card -->
+          <div class="panel-card">
+            <div class="card-header">
+              <div class="card-title-group">
+                <h2 class="card-title">Top Ejecutores en Roblox</h2>
+                <span class="card-desc">Ejecutores más usados por los jugadores de FruitsHub</span>
+              </div>
+              <button class="btn btn-sm btn-secondary" onclick="AdminApp.switchTab('tab-executors')">Ver Todo &rarr;</button>
+            </div>
+            <div id="overview-executors-list" class="ranking-list">
+              <div class="loading-state">Calculando estadísticas de ejecutores...</div>
+            </div>
+          </div>
+
+          <!-- Quick Actions & Server Info Card -->
+          <div class="panel-card">
+            <div class="card-header">
+              <div class="card-title-group">
+                <h2 class="card-title">Acciones Rápidas</h2>
+                <span class="card-desc">Operaciones comunes para control inmediato</span>
+              </div>
+            </div>
+
+            <div class="quick-actions-box">
+              <button class="quick-action-btn" onclick="AdminApp.openCreateModal(24, '24h', 'Key de 24 Horas')">
+                <div class="action-btn-icon cyan">+24h</div>
+                <div class="action-btn-text">
+                  <strong>Crear Key 24 Horas</strong>
+                  <span>Genera una key válida por un día</span>
+                </div>
+              </button>
+
+              <button class="quick-action-btn" onclick="AdminApp.openCreateModal(168, '7d', 'Key Semanal')">
+                <div class="action-btn-icon green">+7d</div>
+                <div class="action-btn-text">
+                  <strong>Crear Key Semanal (7 días)</strong>
+                  <span>Acceso extendido para usuarios VIP</span>
+                </div>
+              </button>
+
+              <button class="quick-action-btn" onclick="AdminApp.openCreateModal(-1, 'permanent', 'Key Permanente')">
+                <div class="action-btn-icon amber">∞</div>
+                <div class="action-btn-text">
+                  <strong>Crear Key Permanente (Lifetime)</strong>
+                  <span>Acceso sin fecha de caducidad</span>
+                </div>
+              </button>
+
+              <div class="server-info-strip">
+                <div class="info-item">
+                  <span class="info-name">Versión Activa:</span>
+                  <span class="info-val" id="overview-script-ver">v1.0.1</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-name">Base de Datos:</span>
+                  <span class="info-val green">Turso Cloud LibSQL</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-name">Hosting:</span>
+                  <span class="info-val cyan">Render Web Service</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== TAB 2: KEYS MANAGER ==================== -->
+      <section id="tab-keys" class="tab-panel hidden animate-fade">
+        <div class="panel-card">
+          
+          <!-- Filters & Action Bar -->
+          <div class="keys-control-bar">
+            <!-- Search Input -->
+            <div class="search-input-wrap">
+              <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              <input 
+                type="text" 
+                id="filter-search" 
+                class="form-input search-input" 
+                placeholder="Buscar por key, HWID o nota..."
+              >
+              <button id="btn-clear-search" class="btn-clear-input hidden">&times;</button>
+            </div>
+
+            <div class="filter-controls-group">
+              <!-- Status Filter -->
+              <select id="filter-status" class="form-select">
+                <option value="all">Todos los Estados</option>
+                <option value="active">Solo Activas</option>
+                <option value="expired">Solo Expiradas</option>
+                <option value="revoked">Solo Revocadas</option>
+              </select>
+
+              <!-- Tier Filter -->
+              <select id="filter-tier" class="form-select">
+                <option value="all">Todos los Tiers</option>
+                <option value="24h">24 Horas</option>
+                <option value="7d">7 Días</option>
+                <option value="30d">30 Días</option>
+                <option value="permanent">Permanente</option>
+                <option value="admin">Admin</option>
+              </select>
+
+              <!-- Create Key Button -->
+              <button class="btn btn-primary" onclick="AdminApp.openCreateModal()">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                <span>Nueva Key</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Keys Table -->
+          <div class="table-responsive">
+            <table class="data-table" id="table-keys">
+              <thead>
+                <tr>
+                  <th>Key</th>
+                  <th>Nota / Usuario</th>
+                  <th>Tier</th>
+                  <th>Ejecuciones</th>
+                  <th>HWID Vinculado</th>
+                  <th>Expiración / Estado</th>
+                  <th class="text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="tbody-keys">
+                <tr>
+                  <td colspan="7" class="text-center py-6">Cargando lista de keys...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Pagination Bar -->
+          <div class="pagination-bar">
+            <span class="pagination-info" id="pagination-info">Mostrando 0 de 0 keys</span>
+            <div class="pagination-buttons">
+              <button id="btn-page-prev" class="btn btn-secondary btn-sm" disabled>&larr; Anterior</button>
+              <span class="page-current" id="page-current-number">1</span>
+              <button id="btn-page-next" class="btn btn-secondary btn-sm" disabled>Siguiente &rarr;</button>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ==================== TAB 3: EXECUTOR ANALYTICS ==================== -->
+      <section id="tab-executors" class="tab-panel hidden animate-fade">
+        <div class="panel-card">
+          <div class="card-header">
+            <div class="card-title-group">
+              <h2 class="card-title">Distribución y Analítica de Ejecutores</h2>
+              <span class="card-desc">Análisis detallado de qué clientes o ejecutores de Roblox lanzan FruitsHub</span>
+            </div>
+            <div class="time-filter-pills">
+              <button class="pill-btn active" data-range="all">Todo el Tiempo</button>
+              <button class="pill-btn" data-range="7d">Últimos 7 días</button>
+              <button class="pill-btn" data-range="24h">Últimas 24 horas</button>
+            </div>
+          </div>
+
+          <!-- Big Summary Box -->
+          <div class="executors-stats-container">
+            <div class="executors-chart-box" id="executors-visual-chart">
+              <!-- Visual percentage bars injected via JS -->
+            </div>
+
+            <!-- Detailed Table -->
+            <div class="table-responsive mt-6">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Ejecutor</th>
+                    <th>Ejecuciones Registradas</th>
+                    <th>Porcentaje</th>
+                    <th>Última Detección</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-executors-detail">
+                  <tr><td colspan="4" class="text-center py-6">Cargando datos de ejecutores...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== TAB 4: LIVE LOGS ==================== -->
+      <section id="tab-logs" class="tab-panel hidden animate-fade">
+        <div class="panel-card">
+          <div class="card-header">
+            <div class="card-title-group">
+              <h2 class="card-title">Registro de Ejecuciones en Vivo</h2>
+              <span class="card-desc">Últimos 50 eventos de carga del script en tiempo real</span>
+            </div>
+            <div class="logs-header-actions">
+              <button id="btn-toggle-autorefresh" class="btn btn-sm btn-secondary active-mode">
+                <span class="live-dot"></span> Auto-refresh: ON (10s)
+              </button>
+              <button id="btn-refresh-logs" class="btn btn-sm btn-secondary">Actualizar</button>
+            </div>
+          </div>
+
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Fecha y Hora</th>
+                  <th>Key Usada</th>
+                  <th>Ejecutor Detectado</th>
+                  <th>HWID Dispositivo</th>
+                  <th>IP (Ofuscada)</th>
+                  <th>Resultado</th>
+                </tr>
+              </thead>
+              <tbody id="tbody-logs">
+                <tr><td colspan="6" class="text-center py-6">Cargando feed de eventos...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ==================== MODAL: CREATE KEY ==================== -->
+  <div id="modal-create-key" class="modal-backdrop hidden">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 class="modal-title">Generar Nueva Key</h3>
+        <button class="modal-close-btn" onclick="AdminApp.closeModals()">&times;</button>
+      </div>
+      <form id="form-create-key" class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Duración / Validez</label>
+          <select id="modal-create-duration" class="form-select">
+            <option value="24">24 Horas (1 Día)</option>
+            <option value="72">72 Horas (3 Días)</option>
+            <option value="168">7 Días (1 Semana)</option>
+            <option value="720">30 Días (1 Mes)</option>
+            <option value="-1">Permanente / Lifetime</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Nivel de Acceso (Tier)</label>
+          <select id="modal-create-tier" class="form-select">
+            <option value="24h">Standard (24h)</option>
+            <option value="vip">VIP</option>
+            <option value="premium">Premium</option>
+            <option value="permanent">Permanente</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Nota o Dueño (Opcional)</label>
+          <input type="text" id="modal-create-note" class="form-input" placeholder="Ej: Para sorteo Discord, Amigo Pedro...">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Cantidad a Generar</label>
+          <input type="number" id="modal-create-count" class="form-input" min="1" max="20" value="1">
+          <small class="form-hint">Puedes generar de 1 a 20 keys de golpe.</small>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="AdminApp.closeModals()">Cancelar</button>
+          <button type="submit" id="btn-submit-create" class="btn btn-primary">
+            <span>Generar Key(s)</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: EXTEND KEY ==================== -->
+  <div id="modal-extend-key" class="modal-backdrop hidden">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 class="modal-title">Extender Duración de Key</h3>
+        <button class="modal-close-btn" onclick="AdminApp.closeModals()">&times;</button>
+      </div>
+      <form id="form-extend-key" class="modal-body">
+        <input type="hidden" id="modal-extend-key-id">
+        <p class="mb-4 text-secondary text-sm">Key: <code id="modal-extend-key-display" class="font-mono text-cyan"></code></p>
+        
+        <div class="form-group">
+          <label class="form-label">Tiempo Adicional a Sumar</label>
+          <select id="modal-extend-hours" class="form-select">
+            <option value="24">+24 Horas (1 Día)</option>
+            <option value="72">+3 Días</option>
+            <option value="168">+7 Días (1 Semana)</option>
+            <option value="720">+30 Días (1 Mes)</option>
+            <option value="perm">Convertir en Permanente (Lifetime)</option>
+          </select>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="AdminApp.closeModals()">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar Extensión</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==================== TOAST NOTIFICATION CONTAINER ==================== -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Dashboard JavaScript Application -->
+  <script src="admin.js"></script>
+</body>
+</html>

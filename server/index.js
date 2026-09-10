@@ -16,7 +16,7 @@ const __dirname = path.dirname(__filename);
 // ==================== CONFIGURATION ====================
 const CONFIG = {
     PORT: process.env.PORT || 3000,
-    ADMIN_SECRET: process.env.ADMIN_SECRET || "FH_ADMIN_ROOT_SECRET_2026",
+    ADMIN_SECRET: process.env.ADMIN_SECRET || "Juanjonosoy0//////",
     SIGNING_SECRET: process.env.SIGNING_SECRET || "FH_SEC_98f12a4b8c3d7e502164a3e8b09c1d2e",
     MIN_WAIT_SECONDS: parseInt(process.env.MIN_WAIT_SECONDS || "20", 10),
     KEY_DURATION_HOURS: parseInt(process.env.KEY_DURATION_HOURS || "24", 10),
@@ -109,6 +109,34 @@ async function initDatabase() {
             updated_at TEXT
         );
     `);
+
+    // Execution logs for real-time telemetry and executor analytics
+    await db.execute(`
+        CREATE TABLE IF NOT EXISTS execution_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            key TEXT,
+            hwid TEXT,
+            executor TEXT DEFAULT 'Unknown',
+            status TEXT DEFAULT 'success',
+            ip TEXT,
+            created_at INTEGER
+        );
+    `);
+    await db.execute(`CREATE INDEX IF NOT EXISTS idx_exec_logs_created ON execution_logs (created_at);`);
+    await db.execute(`CREATE INDEX IF NOT EXISTS idx_exec_logs_executor ON execution_logs (executor);`);
+    await db.execute(`CREATE INDEX IF NOT EXISTS idx_exec_logs_key ON execution_logs (key);`);
+
+    // Safe schema migrations for existing keys table
+    try {
+        await db.execute(`ALTER TABLE keys ADD COLUMN executions_count INTEGER DEFAULT 0;`);
+    } catch (e) {
+        // Column already exists
+    }
+    try {
+        await db.execute(`ALTER TABLE keys ADD COLUMN note TEXT DEFAULT '';`);
+    } catch (e) {
+        // Column already exists
+    }
 
     // Seed persistent keys so they always exist on cold start
     const SEED_KEYS = [
@@ -313,8 +341,20 @@ local function getClientHWID()
     return tostring(clientId ~= "" and clientId or "UNKNOWN_CLIENT")
 end
 
+local function getClientExecutor()
+    if identifyexecutor then
+        local ok, n = pcall(identifyexecutor)
+        if ok and n and tostring(n) ~= "" then return tostring(n) end
+    elseif getexecutorname then
+        local ok, n = pcall(getexecutorname)
+        if ok and n and tostring(n) ~= "" then return tostring(n) end
+    end
+    return "Unknown"
+end
+
 local Key = tostring(getgenv().Key or getgenv().FruitsHubKey or ""):gsub("%s+", "")
 local HWID = getClientHWID()
+local EX = getClientExecutor()
 local CachePath = "FruitsHub/cache_v1.luau"
 local VerPath = "FruitsHub/version.txt"
 
@@ -322,11 +362,18 @@ local hasFs = (writefile and readfile and isfile) ~= nil
 local localCached = hasFs and isfile(CachePath)
 local cachedVersion = (hasFs and isfile(VerPath)) and readfile(VerPath) or "none"
 
+local encEx = EX
+pcall(function()
+    local hs = game:GetService("HttpService")
+    if hs and hs.UrlEncode then encEx = hs:UrlEncode(EX) end
+end)
+
 local requestUrl = string.format(
-    "${baseUrl}/load?key=%s&hwid=%s&cv=%s",
+    "${baseUrl}/load?key=%s&hwid=%s&cv=%s&ex=%s",
     Key,
     HWID,
-    localCached and cachedVersion or "none"
+    localCached and cachedVersion or "none",
+    encEx
 )
 
 local success, scriptContent = pcall(function()
@@ -385,12 +432,34 @@ function generateKickResponse(message, copyUrl) {
     `;
 }
 
+// Helper to record execution events for telemetry & analytics
+async function recordExecutionLog(keyStr, hwidStr, execStr, statusStr, ipStr) {
+    try {
+        await db.execute({
+            sql: "INSERT INTO execution_logs (key, hwid, executor, status, ip, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            args: [
+                String(keyStr || "NONE").substring(0, 100),
+                String(hwidStr || "UNKNOWN").substring(0, 120),
+                String(execStr || "Unknown").substring(0, 60),
+                String(statusStr || "unknown").substring(0, 30),
+                String(ipStr || "0.0.0.0").substring(0, 50),
+                Date.now()
+            ]
+        });
+    } catch (e) {
+        console.error("[-] Failed to record execution log:", e.message);
+    }
+}
+
 // 4. Roblox Load Endpoint (Key Auth & Script Delivery)
 app.get(["/load", "/load.luau"], async (req, res) => {
     const baseUrl = getBaseUrl(req);
     const key = req.query.key ? String(req.query.key).trim() : "";
     const hwid = req.query.hwid ? String(req.query.hwid).trim() : "UNKNOWN_HWID";
     const clientVersion = req.query.cv ? String(req.query.cv).trim() : "";
+    const rawEx = req.query.ex ? String(req.query.ex).trim() : "Unknown";
+    const executor = rawEx.length > 50 ? rawEx.substring(0, 50) : rawEx;
+    const clientIp = (req.headers["x-forwarded-for"] || req.socket.remoteAddress || "").split(",")[0].trim();
     const keyUrl = `${baseUrl}/?hwid=${encodeURIComponent(hwid)}`;
 
     res.setHeader("Content-Type", "text/plain; charset=utf-8");
@@ -398,10 +467,12 @@ app.get(["/load", "/load.luau"], async (req, res) => {
     res.setHeader("X-FruitsHub-Version", SCRIPT_CACHE.version);
 
     if (!key || key === "PASTE_KEY_HERE" || key === "nil" || key === "YOUR_KEY_HERE" || key === "") {
+        recordExecutionLog("NONE", hwid, executor, "missing_key", clientIp);
         return res.status(200).send(generateKickResponse("FruitsHub: No access key provided. Key link has been copied to your clipboard.", keyUrl));
     }
 
     if (SCRIPT_CACHE.maintenance) {
+        recordExecutionLog(key, hwid, executor, "maintenance", clientIp);
         return res.status(200).send(generateKickResponse("FruitsHub: Script is currently down for scheduled maintenance."));
     }
 
@@ -437,15 +508,18 @@ app.get(["/load", "/load.luau"], async (req, res) => {
         }
 
         if (!keyRow) {
+            recordExecutionLog(key, hwid, executor, "invalid_key", clientIp);
             return res.status(200).send(generateKickResponse("FruitsHub: Invalid key. Key link has been copied to your clipboard to generate a new one.", keyUrl));
         }
 
         if (!keyRow.active) {
+            recordExecutionLog(key, hwid, executor, "deactivated", clientIp);
             return res.status(200).send(generateKickResponse("FruitsHub: This key has been deactivated or blacklisted."));
         }
 
         const expiresDate = keyRow.expires_at ? new Date(String(keyRow.expires_at)) : null;
         if (expiresDate && expiresDate < new Date()) {
+            recordExecutionLog(key, hwid, executor, "expired", clientIp);
             return res.status(200).send(generateKickResponse("FruitsHub: Access key expired. Key link has been copied to your clipboard to renew.", keyUrl));
         }
 
@@ -457,17 +531,18 @@ app.get(["/load", "/load.luau"], async (req, res) => {
                 args: [hwid, nowIso, nowIso, key]
             });
         } else if (keyRow.hwid !== hwid) {
+            recordExecutionLog(key, hwid, executor, "hwid_mismatch", clientIp);
             return res.status(200).send(generateKickResponse("FruitsHub: Key is locked to another device (HWID Mismatch). Each key is single-device.", keyUrl));
-        } else {
-            // Debounced last_used update: only update if >15 minutes to save DB writes
-            const lastUsedMs = keyRow.last_used ? new Date(String(keyRow.last_used)).getTime() : 0;
-            if (Date.now() - lastUsedMs > 15 * 60 * 1000) {
-                await db.execute({
-                    sql: "UPDATE keys SET last_used = ? WHERE key = ?",
-                    args: [nowIso, key]
-                });
-            }
         }
+
+        // Increment executions_count and update last_used
+        await db.execute({
+            sql: "UPDATE keys SET executions_count = COALESCE(executions_count, 0) + 1, last_used = ? WHERE key = ?",
+            args: [nowIso, key]
+        });
+
+        // Record successful execution log
+        recordExecutionLog(key, hwid, executor, "success", clientIp);
 
         if (!SCRIPT_CACHE.payload) {
             return res.status(200).send(generateKickResponse(`FruitsHub: Error loading script build ${SCRIPT_CACHE.version}. Contact support.`));
@@ -746,6 +821,489 @@ app.post("/admin/key", async (req, res) => {
     return res.status(400).json({ error: "Invalid action" });
 });
 
+// ==================== COMPREHENSIVE ADMIN API SUITE ====================
+
+// Anti-bruteforce protection for admin login: max 5 failed attempts per 15 min per IP
+const adminLoginAttempts = new Map();
+
+function checkAdminLoginRateLimit(ip) {
+    const now = Date.now();
+    const entry = adminLoginAttempts.get(ip);
+    if (entry) {
+        if (now - entry.lastAttempt > 15 * 60 * 1000) {
+            adminLoginAttempts.delete(ip);
+            return true;
+        }
+        if (entry.count >= 5) {
+            return false;
+        }
+    }
+    return true;
+}
+
+function recordAdminFailedLogin(ip) {
+    const now = Date.now();
+    const entry = adminLoginAttempts.get(ip) || { count: 0, lastAttempt: now };
+    entry.count++;
+    entry.lastAttempt = now;
+    adminLoginAttempts.set(ip, entry);
+}
+
+function clearAdminLoginRateLimit(ip) {
+    adminLoginAttempts.delete(ip);
+}
+
+// Strict Admin Auth Middleware
+function requireAdminAuth(req, res, next) {
+    const authHeader = req.headers["authorization"] || "";
+    let token = "";
+    if (authHeader.startsWith("Bearer ")) {
+        token = authHeader.substring(7).trim();
+    } else if (authHeader) {
+        token = authHeader.trim();
+    }
+
+    if (!token && req.query && req.query.admin_token) {
+        token = String(req.query.admin_token).trim();
+    }
+
+    if (!token) {
+        return res.status(401).json({ error: "Unauthorized: Missing admin credentials" });
+    }
+
+    // Direct match with ADMIN_SECRET
+    if (token === CONFIG.ADMIN_SECRET) {
+        return next();
+    }
+
+    // Signed admin session token verification
+    const sessionData = verifyAndDecodeData(token, CONFIG.SIGNING_SECRET);
+    if (sessionData && sessionData.admin === true) {
+        // Valid session for 7 days
+        if (Date.now() - (sessionData.created_at || 0) < 7 * 24 * 3600 * 1000) {
+            return next();
+        }
+    }
+
+    return res.status(401).json({ error: "Unauthorized: Invalid or expired admin credentials" });
+}
+
+// 8.1 Admin Login
+app.post("/api/admin/login", (req, res) => {
+    const clientIp = (req.headers["x-forwarded-for"] || req.socket.remoteAddress || "").split(",")[0].trim();
+    if (!checkAdminLoginRateLimit(clientIp)) {
+        return res.status(429).json({ error: "Too many failed attempts. Please try again in 15 minutes." });
+    }
+
+    const secret = req.body.secret || req.body.password || "";
+    if (secret !== CONFIG.ADMIN_SECRET) {
+        recordAdminFailedLogin(clientIp);
+        return res.status(401).json({ error: "Invalid admin secret" });
+    }
+
+    clearAdminLoginRateLimit(clientIp);
+    const sessionToken = signData({ admin: true, created_at: Date.now() }, CONFIG.SIGNING_SECRET);
+    return res.status(200).json({ success: true, token: sessionToken });
+});
+
+// 8.2 Admin Verify Session
+app.get("/api/admin/verify", requireAdminAuth, (req, res) => {
+    return res.status(200).json({ success: true, admin: true });
+});
+
+// 8.3 Admin Dashboard Overview KPIs
+app.get("/api/admin/overview", requireAdminAuth, async (req, res) => {
+    try {
+        const nowIso = new Date().toISOString();
+        const yesterdayMs = Date.now() - 24 * 3600 * 1000;
+
+        // Total keys
+        const totalKeysRes = await db.execute("SELECT COUNT(*) as count FROM keys;");
+        const totalKeys = Number(totalKeysRes.rows[0]?.count || 0);
+
+        // Active keys
+        const activeKeysRes = await db.execute({
+            sql: "SELECT COUNT(*) as count FROM keys WHERE active = 1 AND (expires_at > ? OR tier IN ('permanent', 'lifetime', 'admin'));",
+            args: [nowIso]
+        });
+        const activeKeys = Number(activeKeysRes.rows[0]?.count || 0);
+
+        // Total executions (sum of executions_count from keys)
+        const totalExecsRes = await db.execute("SELECT SUM(COALESCE(executions_count, 0)) as total FROM keys;");
+        let totalExecs = Number(totalExecsRes.rows[0]?.total || 0);
+
+        // Also check count of successful logs in execution_logs
+        const totalLogsRes = await db.execute("SELECT COUNT(*) as total FROM execution_logs WHERE status = 'success';");
+        const totalLogs = Number(totalLogsRes.rows[0]?.total || 0);
+        if (totalLogs > totalExecs) totalExecs = totalLogs;
+
+        // Executions today (last 24h)
+        const todayExecsRes = await db.execute({
+            sql: "SELECT COUNT(*) as count FROM execution_logs WHERE created_at > ? AND status = 'success';",
+            args: [yesterdayMs]
+        });
+        const todayExecs = Number(todayExecsRes.rows[0]?.count || 0);
+
+        // Top 5 Executors
+        const topExecutorsRes = await db.execute(`
+            SELECT executor, COUNT(*) as count 
+            FROM execution_logs 
+            WHERE status = 'success'
+            GROUP BY executor 
+            ORDER BY count DESC 
+            LIMIT 5;
+        `);
+        const topExecutors = topExecutorsRes.rows.map(r => ({
+            executor: String(r.executor || "Unknown"),
+            count: Number(r.count || 0)
+        }));
+
+        return res.status(200).json({
+            success: true,
+            kpi: {
+                totalKeys,
+                activeKeys,
+                totalExecutions: totalExecs,
+                todayExecutions: todayExecs,
+                maintenance: SCRIPT_CACHE.maintenance,
+                activeVersion: SCRIPT_CACHE.version
+            },
+            topExecutors
+        });
+    } catch (err) {
+        console.error("[-] Overview KPI error:", err);
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+// 8.4 Keys Management: List & Filter Keys
+app.get("/api/admin/keys", requireAdminAuth, async (req, res) => {
+    try {
+        const search = String(req.query.search || "").trim();
+        const status = String(req.query.status || "all").toLowerCase();
+        const tier = String(req.query.tier || "all").toLowerCase();
+        const page = Math.max(1, parseInt(req.query.page || "1", 10));
+        const limit = Math.min(100, Math.max(5, parseInt(req.query.limit || "50", 10)));
+        const offset = (page - 1) * limit;
+
+        const nowIso = new Date().toISOString();
+        const whereClauses = [];
+        const args = [];
+
+        if (search) {
+            whereClauses.push("(key LIKE ? OR hwid LIKE ? OR note LIKE ?)");
+            const wild = `%${search}%`;
+            args.push(wild, wild, wild);
+        }
+
+        if (status === "active") {
+            whereClauses.push("(active = 1 AND (expires_at > ? OR tier IN ('permanent', 'lifetime', 'admin')))");
+            args.push(nowIso);
+        } else if (status === "expired") {
+            whereClauses.push("(expires_at <= ? AND tier NOT IN ('permanent', 'lifetime', 'admin'))");
+            args.push(nowIso);
+        } else if (status === "revoked" || status === "inactive") {
+            whereClauses.push("active = 0");
+        }
+
+        if (tier !== "all") {
+            whereClauses.push("tier = ?");
+            args.push(tier);
+        }
+
+        const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(" AND ")}` : "";
+
+        // Total count query
+        const countRes = await db.execute({
+            sql: `SELECT COUNT(*) as total FROM keys ${whereSql};`,
+            args
+        });
+        const total = Number(countRes.rows[0]?.total || 0);
+
+        // Paginated rows query
+        const rowsRes = await db.execute({
+            sql: `SELECT key, hwid, created_at, expires_at, active, tier, provider, executions_count, note, last_used 
+                  FROM keys ${whereSql} 
+                  ORDER BY created_at DESC 
+                  LIMIT ? OFFSET ?;`,
+            args: [...args, limit, offset]
+        });
+
+        const keys = rowsRes.rows.map(r => {
+            const isPerm = ["permanent", "lifetime", "admin"].includes(String(r.tier || "").toLowerCase());
+            const exp = r.expires_at ? new Date(String(r.expires_at)).getTime() : 0;
+            const isExpired = !isPerm && exp > 0 && exp < Date.now();
+            return {
+                key: String(r.key),
+                hwid: String(r.hwid || "UNSET"),
+                created_at: r.created_at,
+                expires_at: r.expires_at,
+                active: Number(r.active) === 1,
+                tier: String(r.tier || "24h"),
+                provider: String(r.provider || "admin"),
+                executions_count: Number(r.executions_count || 0),
+                note: String(r.note || ""),
+                last_used: r.last_used,
+                status: !r.active ? "revoked" : (isExpired ? "expired" : "active")
+            };
+        });
+
+        return res.status(200).json({
+            success: true,
+            keys,
+            pagination: {
+                total,
+                page,
+                limit,
+                totalPages: Math.ceil(total / limit) || 1
+            }
+        });
+    } catch (err) {
+        console.error("[-] List keys error:", err);
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+// 8.5 Key Management: Create Key (Single or Bulk)
+app.post("/api/admin/keys/create", requireAdminAuth, async (req, res) => {
+    try {
+        const { durationHours, tier = "24h", note = "", count = 1 } = req.body;
+        const totalToCreate = Math.min(20, Math.max(1, parseInt(count || "1", 10)));
+        const hours = parseFloat(durationHours);
+        const isPermanent = hours === -1 || tier === "permanent" || tier === "lifetime";
+
+        const now = Date.now();
+        const nowIso = new Date(now).toISOString();
+        const expiresMs = isPermanent ? Date.now() + 100 * 365 * 24 * 3600 * 1000 : (now + (hours || 24) * 3600 * 1000);
+        const expiresIso = new Date(expiresMs).toISOString();
+        const finalTier = isPermanent ? "permanent" : (tier || "24h");
+
+        const createdKeys = [];
+
+        for (let i = 0; i < totalToCreate; i++) {
+            const keyStr = generateSignedKey("UNSET", expiresMs, finalTier);
+            await db.execute({
+                sql: "INSERT OR REPLACE INTO keys (key, hwid, created_at, expires_at, active, tier, provider, executions_count, note) VALUES (?, 'UNSET', ?, ?, 1, ?, 'admin', 0, ?)",
+                args: [keyStr, nowIso, expiresIso, finalTier, String(note || "").trim()]
+            });
+            createdKeys.push({
+                key: keyStr,
+                hwid: "UNSET",
+                tier: finalTier,
+                expires_at: expiresIso,
+                created_at: nowIso,
+                note: note || ""
+            });
+        }
+
+        return res.status(200).json({
+            success: true,
+            keys: createdKeys,
+            count: createdKeys.length
+        });
+    } catch (err) {
+        console.error("[-] Create key error:", err);
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+// 8.6 Key Management: 1-Click HWID Reset
+app.post("/api/admin/keys/reset-hwid", requireAdminAuth, async (req, res) => {
+    try {
+        const { key } = req.body;
+        if (!key) return res.status(400).json({ error: "Missing key" });
+
+        const result = await db.execute({
+            sql: "UPDATE keys SET hwid = 'UNSET' WHERE key = ?",
+            args: [String(key).trim()]
+        });
+
+        if (result.rowsAffected === 0) {
+            return res.status(404).json({ error: "Key not found" });
+        }
+
+        console.log(`[+] HWID reset to UNSET for key: ${key}`);
+        return res.status(200).json({ success: true, key, hwid: "UNSET" });
+    } catch (err) {
+        console.error("[-] Reset HWID error:", err);
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+// 8.7 Key Management: Toggle Active / Revoke Key
+app.post("/api/admin/keys/toggle-active", requireAdminAuth, async (req, res) => {
+    try {
+        const { key, active } = req.body;
+        if (!key) return res.status(400).json({ error: "Missing key" });
+        const newActive = active ? 1 : 0;
+
+        await db.execute({
+            sql: "UPDATE keys SET active = ? WHERE key = ?",
+            args: [newActive, String(key).trim()]
+        });
+
+        return res.status(200).json({ success: true, key, active: newActive === 1 });
+    } catch (err) {
+        console.error("[-] Toggle active error:", err);
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+// 8.8 Key Management: Extend Expiry or Convert to Permanent
+app.post("/api/admin/keys/extend", requireAdminAuth, async (req, res) => {
+    try {
+        const { key, addHours, makePermanent } = req.body;
+        if (!key) return res.status(400).json({ error: "Missing key" });
+
+        const rowRes = await db.execute({
+            sql: "SELECT expires_at, tier FROM keys WHERE key = ?",
+            args: [String(key).trim()]
+        });
+
+        if (rowRes.rows.length === 0) {
+            return res.status(404).json({ error: "Key not found" });
+        }
+
+        let newExpiresIso = "";
+        let newTier = rowRes.rows[0].tier;
+
+        if (makePermanent) {
+            newExpiresIso = new Date(Date.now() + 100 * 365 * 24 * 3600 * 1000).toISOString();
+            newTier = "permanent";
+        } else {
+            const curExp = rowRes.rows[0].expires_at ? new Date(String(rowRes.rows[0].expires_at)).getTime() : Date.now();
+            const baseMs = Math.max(Date.now(), curExp);
+            const addedMs = parseFloat(addHours || 24) * 3600 * 1000;
+            newExpiresIso = new Date(baseMs + addedMs).toISOString();
+        }
+
+        await db.execute({
+            sql: "UPDATE keys SET expires_at = ?, tier = ?, active = 1 WHERE key = ?",
+            args: [newExpiresIso, newTier, String(key).trim()]
+        });
+
+        return res.status(200).json({ success: true, key, expires_at: newExpiresIso, tier: newTier });
+    } catch (err) {
+        console.error("[-] Extend key error:", err);
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+// 8.9 Key Management: Delete Key
+app.delete("/api/admin/keys/:key", requireAdminAuth, async (req, res) => {
+    try {
+        const key = String(req.params.key).trim();
+        await db.execute({
+            sql: "DELETE FROM keys WHERE key = ?",
+            args: [key]
+        });
+        return res.status(200).json({ success: true, key });
+    } catch (err) {
+        console.error("[-] Delete key error:", err);
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+// 8.10 Executor Statistics: Detailed Distribution & Breakdown
+app.get("/api/admin/stats/executors", requireAdminAuth, async (req, res) => {
+    try {
+        const range = req.query.range || "all"; // 'all', '7d', '24h'
+        let timeCondition = "";
+        const args = [];
+
+        if (range === "24h") {
+            timeCondition = "AND created_at > ?";
+            args.push(Date.now() - 24 * 3600 * 1000);
+        } else if (range === "7d") {
+            timeCondition = "AND created_at > ?";
+            args.push(Date.now() - 7 * 24 * 3600 * 1000);
+        }
+
+        const statsRes = await db.execute({
+            sql: `SELECT executor, COUNT(*) as count, MAX(created_at) as last_seen 
+                  FROM execution_logs 
+                  WHERE status = 'success' ${timeCondition}
+                  GROUP BY executor 
+                  ORDER BY count DESC;`,
+            args
+        });
+
+        const totalCount = statsRes.rows.reduce((sum, r) => sum + Number(r.count || 0), 0);
+
+        const executors = statsRes.rows.map(r => {
+            const count = Number(r.count || 0);
+            const percentage = totalCount > 0 ? parseFloat(((count / totalCount) * 100).toFixed(1)) : 0;
+            return {
+                executor: String(r.executor || "Unknown"),
+                count,
+                percentage,
+                last_seen: r.last_seen ? new Date(Number(r.last_seen)).toISOString() : null
+            };
+        });
+
+        return res.status(200).json({
+            success: true,
+            totalExecutions: totalCount,
+            range,
+            executors
+        });
+    } catch (err) {
+        console.error("[-] Executor stats error:", err);
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+// 8.11 Recent Execution Logs Feed
+app.get("/api/admin/stats/recent-logs", requireAdminAuth, async (req, res) => {
+    try {
+        const limit = Math.min(100, Math.max(10, parseInt(req.query.limit || "50", 10)));
+        const logsRes = await db.execute({
+            sql: `SELECT id, key, hwid, executor, status, ip, created_at 
+                  FROM execution_logs 
+                  ORDER BY created_at DESC 
+                  LIMIT ?;`,
+            args: [limit]
+        });
+
+        const logs = logsRes.rows.map(r => {
+            const ipRaw = String(r.ip || "0.0.0.0");
+            const maskedIp = ipRaw.replace(/(\d+)\.(\d+)\.(\d+)\.(\d+)/, "$1.$2.$3.xxx");
+            return {
+                id: r.id,
+                key: String(r.key || ""),
+                hwid: String(r.hwid || ""),
+                executor: String(r.executor || "Unknown"),
+                status: String(r.status || "success"),
+                ip: maskedIp,
+                created_at: Number(r.created_at || Date.now())
+            };
+        });
+
+        return res.status(200).json({ success: true, logs });
+    } catch (err) {
+        console.error("[-] Recent logs error:", err);
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+// 8.12 Maintenance Mode Toggle
+app.post("/api/admin/maintenance", requireAdminAuth, async (req, res) => {
+    try {
+        const { maintenance } = req.body;
+        const maintVal = maintenance ? "true" : "false";
+        await db.execute({
+            sql: "INSERT OR REPLACE INTO system_config (key, value) VALUES ('MAINTENANCE', ?)",
+            args: [maintVal]
+        });
+        SCRIPT_CACHE.maintenance = !!maintenance;
+        console.log(`[+] Global Maintenance Mode set to: ${SCRIPT_CACHE.maintenance}`);
+        return res.status(200).json({ success: true, maintenance: SCRIPT_CACHE.maintenance });
+    } catch (err) {
+        console.error("[-] Maintenance toggle error:", err);
+        return res.status(500).json({ error: err.message });
+    }
+});
+
 // 9. Instant Script Deployment API (Replaces Wrangler KV deploy)
 app.post("/api/deploy", async (req, res) => {
     const authHeader = req.headers["authorization"] || "";
@@ -937,6 +1495,12 @@ app.get("/api/user/telemetry", async (req, res) => {
         accounts,
         serverTime: now
     });
+});
+
+// 9.5 Admin Console Web Delivery
+app.use("/admin", express.static(path.join(__dirname, "admin")));
+app.get(["/admin", "/admin/*"], (req, res) => {
+    res.sendFile(path.join(__dirname, "admin", "index.html"));
 });
 
 // 10. Clean Dark Mode Key System Portal
