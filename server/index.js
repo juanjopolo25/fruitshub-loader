@@ -830,11 +830,11 @@ function checkAdminLoginRateLimit(ip) {
     const now = Date.now();
     const entry = adminLoginAttempts.get(ip);
     if (entry) {
-        if (now - entry.lastAttempt > 15 * 60 * 1000) {
+        if (now - entry.lastAttempt > 5 * 60 * 1000) {
             adminLoginAttempts.delete(ip);
             return true;
         }
-        if (entry.count >= 5) {
+        if (entry.count >= 25) {
             return false;
         }
     }

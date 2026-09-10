@@ -303,6 +303,9 @@ const AdminApp = (() => {
       `;
     });
 
+    listEl.innerHTML = html;
+  }
+
   // Key Pill Formatter (Prevents vertical breaking and allows 1-click copy)
   function formatKeyPill(key) {
     if (!key || key === "NONE") return `<span style="color: var(--text-muted);">—</span>`;
