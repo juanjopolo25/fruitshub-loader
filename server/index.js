@@ -1447,6 +1447,54 @@ app.delete("/api/admin/keys/:key", requireAdminAuth, async (req, res) => {
     }
 });
 
+// ==================== BACKGROUND RETENTION & CLEANUP ====================
+// Automatically prunes expired keys older than retentionDays (default 7 days)
+// to maintain database hygiene while preserving grace period for renewals & support.
+// Permanent, lifetime, admin, and seed keys are strictly exempt and NEVER deleted.
+async function pruneExpiredKeys(retentionDays = 7) {
+    try {
+        const days = Math.max(1, Number(retentionDays) || 7);
+        const cutoffIso = new Date(Date.now() - days * 24 * 3600 * 1000).toISOString();
+
+        const result = await db.execute({
+            sql: `DELETE FROM keys 
+                  WHERE expires_at IS NOT NULL 
+                    AND expires_at != ''
+                    AND expires_at < ? 
+                    AND LOWER(COALESCE(tier, '24h')) NOT IN ('permanent', 'lifetime', 'admin')
+                    AND provider != 'seed';`,
+            args: [cutoffIso]
+        });
+
+        const deletedCount = Number(result.rowsAffected || 0);
+        if (deletedCount > 0) {
+            console.log(`[+] [Auto-Cleanup] Successfully pruned ${deletedCount} expired key(s) older than ${days} days (cutoff: ${cutoffIso}).`);
+        } else {
+            console.log(`[i] [Auto-Cleanup] Key retention check completed. No keys older than ${days} days found.`);
+        }
+        return { success: true, deletedCount, cutoff: cutoffIso };
+    } catch (err) {
+        console.error("[-] [Auto-Cleanup] Error during expired keys purge:", err.message);
+        return { success: false, error: err.message };
+    }
+}
+
+// 8.9.1 Key Management: Purge Expired Keys Manually
+app.post("/api/admin/keys/purge-expired", requireAdminAuth, async (req, res) => {
+    try {
+        const days = req.body?.days ? Number(req.body.days) : 7;
+        const result = await pruneExpiredKeys(days);
+        if (!result.success) {
+            return res.status(500).json({ error: result.error });
+        }
+        return res.status(200).json(result);
+    } catch (err) {
+        console.error("[-] Manual purge expired keys error:", err);
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+
 // 8.10 Executor Statistics: Detailed Distribution & Breakdown
 app.get("/api/admin/stats/executors", requireAdminAuth, async (req, res) => {
     try {
@@ -2766,6 +2814,14 @@ function renderSecurityRejection(message, hwid) {
 async function start() {
     await initDatabase();
     await reloadScriptCache();
+
+    // Initial key cleanup check on cold start
+    pruneExpiredKeys(7).catch(e => console.error("[-] Initial prune failed:", e));
+
+    // Recurring task: run once every 24 hours (86,400,000 ms)
+    setInterval(() => {
+        pruneExpiredKeys(7).catch(e => console.error("[-] Recurring prune failed:", e));
+    }, 24 * 3600 * 1000);
 
     app.listen(CONFIG.PORT, () => {
         console.log(`
