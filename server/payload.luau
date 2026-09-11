@@ -1,4 +1,4 @@
---[[FH_VERSION:v1.1.0]]
+﻿--[[FH_VERSION:v1.1.1]]
 --[[
     FruitsHub — Blox Fruits
     Autonomous: Join Marines -> Fruit roll (Gacha) -> Scan & collect
@@ -7,13 +7,15 @@
     Rich Discord alerts with official high-res thumbnails & detailed stats.
 ]]
 
--- Purge stale legacy v1 cache if found on disk
+-- Purge stale legacy v1 cache if found on disk (writefile fallback if delfile missing)
 pcall(function()
-    if isfile and isfile("FruitsHub/cache_v1.luau") and delfile then
-        delfile("FruitsHub/cache_v1.luau")
+    if isfile and isfile("FruitsHub/cache_v1.luau") then
+        if writefile then writefile("FruitsHub/cache_v1.luau", "") end
+        if delfile then delfile("FruitsHub/cache_v1.luau") end
     end
-    if isfile and isfile("FruitsHub/version.txt") and delfile then
-        delfile("FruitsHub/version.txt")
+    if isfile and isfile("FruitsHub/version.txt") then
+        if writefile then writefile("FruitsHub/version.txt", "") end
+        if delfile then delfile("FruitsHub/version.txt") end
     end
 end)
 
@@ -4473,8 +4475,36 @@ local function buildStatusUI()
     local PlayerGui = LP:FindFirstChildOfClass("PlayerGui") or LP:WaitForChild("PlayerGui", 10)
     if not PlayerGui then return end
 
-    local old = PlayerGui:FindFirstChild("FruitsHub") or PlayerGui:FindFirstChild("MuyEstableHub")
-    if old then pcall(function() old:Destroy() end) end
+    -- Comprehensive cleanup of any existing FruitsHub GUI instances
+    pcall(function()
+        for _, g in ipairs(PlayerGui:GetChildren()) do
+            if g:IsA("ScreenGui") and (g.Name == "FruitsHub" or g.Name == "MuyEstableHub") then
+                pcall(function() g:Destroy() end)
+            end
+        end
+    end)
+    pcall(function()
+        local cg = game:GetService("CoreGui")
+        if cg then
+            for _, g in ipairs(cg:GetChildren()) do
+                if g:IsA("ScreenGui") and (g.Name == "FruitsHub" or g.Name == "MuyEstableHub") then
+                    pcall(function() g:Destroy() end)
+                end
+            end
+        end
+    end)
+    pcall(function()
+        if gethui then
+            local h = gethui()
+            if h then
+                for _, g in ipairs(h:GetChildren()) do
+                    if g:IsA("ScreenGui") and (g.Name == "FruitsHub" or g.Name == "MuyEstableHub") then
+                        pcall(function() g:Destroy() end)
+                    end
+                end
+            end
+        end
+    end)
 
     local gui = Instance.new("ScreenGui")
     gui.Name = "FruitsHub"
@@ -4794,6 +4824,13 @@ local function buildStatusUI()
     local expCorner = Instance.new("UICorner")
     expCorner.CornerRadius = UDim.new(0, 4)
     expCorner.Parent = miniExpand
+
+    -- Enforce English text: prevent any engine localization or residual script from overriding
+    miniExpand:GetPropertyChangedSignal("Text"):Connect(function()
+        if miniExpand.Text ~= "Open" then
+            miniExpand.Text = "Open"
+        end
+    end)
 
     -- Minimize Action: Enables 3D rendering and shows mini bar
     btnMin.MouseButton1Click:Connect(function()
