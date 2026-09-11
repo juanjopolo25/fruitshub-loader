@@ -1,3 +1,4 @@
+--[[FH_VERSION:v1.1.0]]
 --[[
     FruitsHub — Blox Fruits
     Autonomous: Join Marines -> Fruit roll (Gacha) -> Scan & collect
@@ -5,6 +6,16 @@
     Status-only Fullscreen GUI (no controls).
     Rich Discord alerts with official high-res thumbnails & detailed stats.
 ]]
+
+-- Purge stale legacy v1 cache if found on disk
+pcall(function()
+    if isfile and isfile("FruitsHub/cache_v1.luau") and delfile then
+        delfile("FruitsHub/cache_v1.luau")
+    end
+    if isfile and isfile("FruitsHub/version.txt") and delfile then
+        delfile("FruitsHub/version.txt")
+    end
+end)
 
 -- ===================== Persistent Config (getgenv) =====================
 getgenv().FruitsHub = getgenv().FruitsHub or {}
@@ -3352,7 +3363,7 @@ function MagnetEvent.getMagnetEnemies()
         end
     end
 
-    -- 2. Buscar en workspace.Enemies
+    -- 2. Search in workspace.Enemies
     local enemiesFolder = workspace:FindFirstChild("Enemies")
     if enemiesFolder then
         for _, e in ipairs(enemiesFolder:GetChildren()) do
@@ -4769,7 +4780,7 @@ local function buildStatusUI()
 
     local miniExpand = Instance.new("TextButton")
     miniExpand.Name = "BtnExpand"
-    miniExpand.Text = "Abrir"
+    miniExpand.Text = "Open"
     miniExpand.Font = Enum.Font.GothamBold
     miniExpand.TextSize = 10
     miniExpand.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -4786,6 +4797,7 @@ local function buildStatusUI()
 
     -- Minimize Action: Enables 3D rendering and shows mini bar
     btnMin.MouseButton1Click:Connect(function()
+        miniExpand.Text = "Open"
         shell.Visible = false
         overlay.Visible = false
         miniBar.Visible = true
@@ -4808,6 +4820,7 @@ local function buildStatusUI()
             UserInputService.InputBegan:Connect(function(input, gProcessed)
                 if not gProcessed and input.KeyCode == Enum.KeyCode.F1 then
                     if shell.Visible then
+                        miniExpand.Text = "Open"
                         shell.Visible = false
                         overlay.Visible = false
                         miniBar.Visible = true

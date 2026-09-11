@@ -489,8 +489,18 @@ end
 local Key = tostring(getgenv().Key or getgenv().FruitsHubKey or ""):gsub("%s+", "")
 local HWID = getClientHWID()
 local EX = getClientExecutor()
-local CachePath = "FruitsHub/cache_v1.luau"
-local VerPath = "FruitsHub/version.txt"
+local CachePath = "FruitsHub/cache_v2.luau"
+local VerPath = "FruitsHub/version_v2.txt"
+
+-- Purge stale legacy v1 cache if present on disk
+pcall(function()
+    if isfile and isfile("FruitsHub/cache_v1.luau") and delfile then
+        delfile("FruitsHub/cache_v1.luau")
+    end
+    if isfile and isfile("FruitsHub/version.txt") and delfile then
+        delfile("FruitsHub/version.txt")
+    end
+end)
 
 local hasFs = (writefile and readfile and isfile) ~= nil
 local localCached = hasFs and isfile(CachePath)
