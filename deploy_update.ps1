@@ -90,6 +90,24 @@ if ($Version -eq "") {
 Write-Host "[*] Reading payload file..." -ForegroundColor Gray
 $payloadContent = [System.IO.File]::ReadAllText($resolvedFile, [System.Text.Encoding]::UTF8)
 
+# Automatically stamp version header in payload
+if ($payloadContent -match '--\[\[FH_VERSION:[^\]]+\]\]') {
+    $payloadContent = $payloadContent -replace '--\[\[FH_VERSION:[^\]]+\]\]', "--[[FH_VERSION:$Version]]"
+} else {
+    $payloadContent = "--[[FH_VERSION:$Version]]`r`n" + $payloadContent
+}
+[System.IO.File]::WriteAllText($resolvedFile, $payloadContent, [System.Text.Encoding]::UTF8)
+
+# Sync server copies if present
+$serverPayload = Join-Path $PSScriptRoot "server\payload.luau"
+if (Test-Path $serverPayload) {
+    [System.IO.File]::WriteAllText($serverPayload, $payloadContent, [System.Text.Encoding]::UTF8)
+}
+$repoLoaderPayload = Join-Path $PSScriptRoot "repo-loader\server\payload.luau"
+if (Test-Path $repoLoaderPayload) {
+    [System.IO.File]::WriteAllText($repoLoaderPayload, $payloadContent, [System.Text.Encoding]::UTF8)
+}
+
 # 1. Upload new payload to Render Server
 Write-Host "[*] Deploying payload to $ServerUrl/api/deploy as '$Version'..." -ForegroundColor Yellow
 $deployBody = @{
