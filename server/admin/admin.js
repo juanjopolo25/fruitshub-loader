@@ -54,7 +54,7 @@ const AdminApp = (() => {
         sessionStorage.removeItem("fh_admin_token");
         authToken = "";
         showLoginOverlay();
-        showToast("Sesión expirada. Por favor introduce tu contraseña de nuevo.", "error");
+        showToast("Session expired. Please enter your secret key again.", "error");
         throw new Error("Unauthorized");
       }
 
@@ -105,19 +105,19 @@ const AdminApp = (() => {
 
   // Formatter for dates
   function formatDate(isoStr) {
-    if (!isoStr) return "Nunca";
+    if (!isoStr) return "Never";
     try {
       const d = new Date(isoStr);
-      if (isNaN(d.getTime())) return "Inválido";
+      if (isNaN(d.getTime())) return "Invalid";
       const now = Date.now();
       const diffMs = d.getTime() - now;
 
       // If permanent (>10 years)
       if (diffMs > 10 * 365 * 24 * 3600 * 1000) {
-        return "Permanente (Lifetime)";
+        return "Permanent (Lifetime)";
       }
 
-      return d.toLocaleDateString("es-ES", {
+      return d.toLocaleDateString("en-US", {
         month: "short",
         day: "numeric",
         hour: "2-digit",
@@ -129,18 +129,18 @@ const AdminApp = (() => {
   }
 
   function formatTimeAgo(timestamp) {
-    if (!timestamp) return "Nunca";
+    if (!timestamp) return "Never";
     const now = Date.now();
     const diffSec = Math.floor((now - timestamp) / 1000);
 
-    if (diffSec < 10) return "Ahora mismo";
-    if (diffSec < 60) return `Hace ${diffSec}s`;
+    if (diffSec < 10) return "Just now";
+    if (diffSec < 60) return `${diffSec}s ago`;
     const min = Math.floor(diffSec / 60);
-    if (min < 60) return `Hace ${min}m`;
+    if (min < 60) return `${min}m ago`;
     const hrs = Math.floor(min / 60);
-    if (hrs < 24) return `Hace ${hrs}h`;
+    if (hrs < 24) return `${hrs}h ago`;
     const days = Math.floor(hrs / 24);
-    return `Hace ${days}d`;
+    return `${days}d ago`;
   }
 
   // UI State Transitions
@@ -194,11 +194,11 @@ const AdminApp = (() => {
       sessionStorage.setItem("fh_admin_token", authToken);
       secretInput.value = "";
       hideLoginOverlay();
-      showToast("¡Consola de administración desbloqueada!", "success");
+      showToast("Admin console unlocked!", "success");
       loadAllData();
       startAutoRefresh();
     } catch (err) {
-      errorBox.textContent = err.message || "Clave secreta incorrecta.";
+      errorBox.textContent = err.message || "Invalid master secret key.";
       errorBox.classList.remove("hidden");
     } finally {
       btnSubmit.disabled = false;
@@ -211,7 +211,7 @@ const AdminApp = (() => {
     authToken = "";
     if (autoRefreshTimer) clearInterval(autoRefreshTimer);
     showLoginOverlay();
-    showToast("Sesión cerrada.", "info");
+    showToast("Signed out.", "info");
   }
 
   // Tab Switcher
@@ -248,7 +248,7 @@ const AdminApp = (() => {
       document.getElementById("kpi-today-execs").textContent = (kpi.todayExecutions || 0).toLocaleString();
       document.getElementById("kpi-total-execs").textContent = (kpi.totalExecutions || 0).toLocaleString();
 
-      document.getElementById("kpi-keys-sub").textContent = `${kpi.activeKeys || 0} activas, ${(kpi.totalKeys || 0) - (kpi.activeKeys || 0)} expiradas`;
+      document.getElementById("kpi-keys-sub").textContent = `${kpi.activeKeys || 0} active, ${(kpi.totalKeys || 0) - (kpi.activeKeys || 0)} expired`;
 
       // Update maintenance status
       isMaintenance = !!kpi.maintenance;
@@ -273,8 +273,8 @@ const AdminApp = (() => {
     if (!topExecutors || topExecutors.length === 0) {
       listEl.innerHTML = `
         <div class="loading-state" style="padding: 16px;">
-          No hay ejecuciones registradas todavía.<br>
-          <small style="color: var(--text-tertiary);">Aparecerán aquí tan pronto como los jugadores ejecuten el script.</small>
+          No executions recorded yet.<br>
+          <small style="color: var(--text-tertiary);">They will appear here as soon as players execute the script.</small>
         </div>
       `;
       return;
@@ -294,7 +294,7 @@ const AdminApp = (() => {
               <span style="color: var(--cyan-400); font-family: var(--font-mono); font-size: 0.75rem;">#${idx + 1}</span>
               ${escapeHtml(item.executor)}
             </span>
-            <span class="ranking-executor-stats">${item.count.toLocaleString()} cargas (${pct}%)</span>
+            <span class="ranking-executor-stats">${item.count.toLocaleString()} loads (${pct}%)</span>
           </div>
           <div class="progress-track">
             <div class="progress-fill ${colorClass}" style="width: ${pct}%"></div>
@@ -313,10 +313,10 @@ const AdminApp = (() => {
       ? `${key.substring(0, 10)}...${key.substring(key.length - 8)}` 
       : key;
     return `
-      <div class="key-pill-wrap" title="Key: ${escapeHtml(key)} (Clic para copiar)" onclick="AdminApp.copyText('${escapeHtml(key)}')">
+      <div class="key-pill-wrap" title="Key: ${escapeHtml(key)} (Click to copy)" onclick="AdminApp.copyText('${escapeHtml(key)}')">
         <span style="font-size: 0.8rem;">🔑</span>
         <code class="key-pill-code">${escapeHtml(display)}</code>
-        <span class="key-copy-hint">Copiar</span>
+        <span class="key-copy-hint">Copy</span>
       </div>
     `;
   }
@@ -342,13 +342,13 @@ const AdminApp = (() => {
       keyState.totalPages = pagination.totalPages || 1;
 
       // Update pagination controls
-      document.getElementById("pagination-info").textContent = `Mostrando ${keys.length} de ${pagination.total || 0} keys (Página ${pagination.page} de ${keyState.totalPages})`;
+      document.getElementById("pagination-info").textContent = `Showing ${keys.length} of ${pagination.total || 0} keys (Page ${pagination.page} of ${keyState.totalPages})`;
       document.getElementById("page-current-number").textContent = pagination.page;
       document.getElementById("btn-page-prev").disabled = pagination.page <= 1;
       document.getElementById("btn-page-next").disabled = pagination.page >= keyState.totalPages;
 
       if (keys.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" class="text-center py-6" style="color: var(--text-tertiary);">No se encontraron keys con los filtros seleccionados.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center py-6" style="color: var(--text-tertiary);">No keys found matching the selected filters.</td></tr>`;
         return;
       }
 
@@ -358,19 +358,19 @@ const AdminApp = (() => {
         const isBound = k.hwid && k.hwid !== "UNSET" && k.hwid !== "UNBOUND";
 
         // Status badge
-        let statusBadge = `<span class="badge badge-active">Activa</span>`;
+        let statusBadge = `<span class="badge badge-active">Active</span>`;
         if (k.status === "revoked") {
-          statusBadge = `<span class="badge badge-revoked">Revocada</span>`;
+          statusBadge = `<span class="badge badge-revoked">Revoked</span>`;
         } else if (k.status === "expired") {
-          statusBadge = `<span class="badge badge-expired">Expirada</span>`;
+          statusBadge = `<span class="badge badge-expired">Expired</span>`;
         }
 
         // HWID badge
-        let hwidBadge = `<span class="badge badge-unset">UNSET (Libre)</span>`;
+        let hwidBadge = `<span class="badge badge-unset">UNSET (Free)</span>`;
         if (isBound) {
           const shortHwid = k.hwid.length > 18 ? `${k.hwid.substring(0, 8)}...${k.hwid.substring(k.hwid.length - 6)}` : k.hwid;
           hwidBadge = `
-            <span class="badge badge-bound" title="${escapeHtml(k.hwid)} (Clic para copiar)" style="cursor: pointer;" onclick="AdminApp.copyText('${escapeHtml(k.hwid)}')">
+            <span class="badge badge-bound" title="${escapeHtml(k.hwid)} (Click to copy)" style="cursor: pointer;" onclick="AdminApp.copyText('${escapeHtml(k.hwid)}')">
               🔒 ${escapeHtml(shortHwid)}
             </span>
           `;
@@ -381,7 +381,7 @@ const AdminApp = (() => {
 
         // Remaining / Expiry String
         let expiryText = formatDate(k.expires_at);
-        if (isPerm) expiryText = "Permanente";
+        if (isPerm) expiryText = "Lifetime";
 
         rowsHtml += `
           <tr>
@@ -419,7 +419,7 @@ const AdminApp = (() => {
                 <!-- 1-Click HWID Reset -->
                 <button 
                   class="btn-action btn-action-hwid" 
-                  title="Liberar HWID para que el usuario pueda usarla en otro PC"
+                  title="Reset device HWID so the user can bind a new machine"
                   onclick="AdminApp.resetHwid('${escapeHtml(k.key)}')"
                 >
                   🔄 Reset HWID
@@ -428,25 +428,25 @@ const AdminApp = (() => {
                 <!-- Extend -->
                 <button 
                   class="btn-action btn-action-extend" 
-                  title="Sumar tiempo a la key"
+                  title="Add time to this key"
                   onclick="AdminApp.openExtendModal('${escapeHtml(k.key)}')"
                 >
-                  + Tiempo
+                  + Extend
                 </button>
 
                 <!-- Toggle Active -->
                 <button 
                   class="btn-action btn-action-toggle" 
-                  title="${k.active ? 'Revocar key' : 'Reactivar key'}"
+                  title="${k.active ? 'Revoke key' : 'Reactivate key'}"
                   onclick="AdminApp.toggleActiveKey('${escapeHtml(k.key)}', ${!k.active})"
                 >
-                  ${k.active ? 'Desactivar' : 'Activar'}
+                  ${k.active ? 'Deactivate' : 'Activate'}
                 </button>
 
                 <!-- Copy Roblox Script Loader -->
                 <button 
                   class="btn-action btn-action-toggle" 
-                  title="Copiar snippet de Roblox con esta Key lista"
+                  title="Copy ready-to-run Roblox loader snippet with this key"
                   onclick="AdminApp.copyLoaderWithKey('${escapeHtml(k.key)}')"
                 >
                   📜 Loader
@@ -455,7 +455,7 @@ const AdminApp = (() => {
                 <!-- Delete -->
                 <button 
                   class="btn-action btn-action-delete" 
-                  title="Eliminar key definitivamente"
+                  title="Permanently delete key"
                   onclick="AdminApp.deleteKey('${escapeHtml(k.key)}')"
                 >
                   🗑️
@@ -468,7 +468,7 @@ const AdminApp = (() => {
 
       tbody.innerHTML = rowsHtml;
     } catch (err) {
-      tbody.innerHTML = `<tr><td colspan="7" class="text-center py-6" style="color: var(--rose-400);">Error al cargar keys: ${escapeHtml(err.message)}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="7" class="text-center py-6" style="color: var(--rose-400);">Error loading keys: ${escapeHtml(err.message)}</td></tr>`;
     }
   }
 
@@ -481,10 +481,10 @@ const AdminApp = (() => {
         body: JSON.stringify({ key })
       });
 
-      showToast("¡HWID liberado correctamente (UNSET)! El usuario ya puede vincular su nuevo dispositivo.", "success");
+      showToast("HWID unbound successfully (UNSET)! User can now bind a new machine.", "success");
       loadKeys();
     } catch (err) {
-      showToast(`Error al resetear HWID: ${err.message}`, "error");
+      showToast(`Error resetting HWID: ${err.message}`, "error");
     }
   }
 
@@ -496,7 +496,7 @@ const AdminApp = (() => {
         body: JSON.stringify({ key, active: newActiveState })
       });
 
-      showToast(`Key ${newActiveState ? "reactivada" : "revocada"} con éxito.`, "success");
+      showToast(`Key ${newActiveState ? "reactivated" : "revoked"} successfully.`, "success");
       loadKeys();
       loadOverview();
     } catch (err) {
@@ -506,7 +506,7 @@ const AdminApp = (() => {
 
   // Delete Key
   async function deleteKey(key) {
-    if (!confirm(`¿Seguro que deseas eliminar la key permanentemente?\n\n${key}`)) {
+    if (!confirm(`Are you sure you want to permanently delete this key?\n\n${key}`)) {
       return;
     }
 
@@ -515,11 +515,11 @@ const AdminApp = (() => {
         method: "DELETE"
       });
 
-      showToast("Key eliminada de la base de datos.", "success");
+      showToast("Key deleted from database.", "success");
       loadKeys();
       loadOverview();
     } catch (err) {
-      showToast(`Error al eliminar: ${err.message}`, "error");
+      showToast(`Error deleting key: ${err.message}`, "error");
     }
   }
 
@@ -572,11 +572,11 @@ const AdminApp = (() => {
       });
 
       closeModals();
-      showToast(`¡Se han generado ${res.count || 1} key(s) exitosamente!`, "success");
+      showToast(`Successfully generated ${res.count || 1} key(s)!`, "success");
       loadKeys();
       loadOverview();
     } catch (err) {
-      showToast(`Error al generar key: ${err.message}`, "error");
+      showToast(`Error generating key: ${err.message}`, "error");
     } finally {
       btn.disabled = false;
     }
@@ -598,10 +598,10 @@ const AdminApp = (() => {
       });
 
       closeModals();
-      showToast("¡Vigencia de la key extendida correctamente!", "success");
+      showToast("Key duration extended successfully!", "success");
       loadKeys();
     } catch (err) {
-      showToast(`Error al extender: ${err.message}`, "error");
+      showToast(`Error extending key: ${err.message}`, "error");
     }
   }
 
@@ -623,8 +623,8 @@ const AdminApp = (() => {
       const totalExecs = data.totalExecutions || 0;
 
       if (executors.length === 0) {
-        chartBox.innerHTML = `<div class="loading-state">No hay ejecuciones registradas en este período.</div>`;
-        tbody.innerHTML = `<tr><td colspan="4" class="text-center py-6" style="color: var(--text-tertiary);">Sin datos disponibles.</td></tr>`;
+        chartBox.innerHTML = `<div class="loading-state">No executions recorded in this time period.</div>`;
+        tbody.innerHTML = `<tr><td colspan="4" class="text-center py-6" style="color: var(--text-tertiary);">No data available.</td></tr>`;
         return;
       }
 
@@ -658,7 +658,7 @@ const AdminApp = (() => {
               <strong style="color: #fff; font-size: 0.9rem;">${escapeHtml(item.executor)}</strong>
             </td>
             <td>
-              <span class="font-mono text-cyan">${item.count.toLocaleString()} cargas</span>
+              <span class="font-mono text-cyan">${item.count.toLocaleString()} loads</span>
             </td>
             <td>
               <span class="badge badge-tier">${item.percentage}%</span>
@@ -685,25 +685,25 @@ const AdminApp = (() => {
       const logs = data.logs || [];
 
       if (logs.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" class="text-center py-6" style="color: var(--text-tertiary);">No hay registros de eventos todavía.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center py-6" style="color: var(--text-tertiary);">No execution events recorded yet.</td></tr>`;
         return;
       }
 
       let rowsHtml = "";
       logs.forEach(log => {
-        let statusBadge = `<span class="badge badge-active">Éxito</span>`;
+        let statusBadge = `<span class="badge badge-active">Success</span>`;
         if (log.status === "expired") {
-          statusBadge = `<span class="badge badge-expired">Key Expirada</span>`;
+          statusBadge = `<span class="badge badge-expired">Expired Key</span>`;
         } else if (log.status === "hwid_mismatch") {
           statusBadge = `<span class="badge badge-revoked">HWID Mismatch</span>`;
         } else if (log.status === "invalid_key") {
-          statusBadge = `<span class="badge badge-revoked">Key Inválida</span>`;
+          statusBadge = `<span class="badge badge-revoked">Invalid Key</span>`;
         } else if (log.status === "missing_key") {
-          statusBadge = `<span class="badge badge-revoked">Sin Key</span>`;
+          statusBadge = `<span class="badge badge-revoked">Missing Key</span>`;
         } else if (log.status === "deactivated") {
-          statusBadge = `<span class="badge badge-revoked">Desactivada</span>`;
+          statusBadge = `<span class="badge badge-revoked">Deactivated</span>`;
         } else if (log.status === "maintenance") {
-          statusBadge = `<span class="badge badge-expired">Mantenimiento</span>`;
+          statusBadge = `<span class="badge badge-expired">Maintenance</span>`;
         }
 
         const shortKey = log.key.length > 20 ? `${log.key.substring(0, 10)}...` : log.key;
@@ -750,10 +750,10 @@ const AdminApp = (() => {
 
       isMaintenance = !!res.maintenance;
       updateMaintenanceUI(isMaintenance);
-      showToast(`Modo Mantenimiento ${isMaintenance ? "ACTIVADO (Scripts pausados)" : "DESACTIVADO (Scripts activos)"}`, isMaintenance ? "error" : "success");
+      showToast(`Maintenance mode ${isMaintenance ? "ENABLED (Scripts paused)" : "DISABLED (Scripts active)"}`, isMaintenance ? "error" : "success");
       loadOverview();
     } catch (err) {
-      showToast(`Error al cambiar mantenimiento: ${err.message}`, "error");
+      showToast(`Error toggling maintenance: ${err.message}`, "error");
     }
   }
 
@@ -762,7 +762,7 @@ const AdminApp = (() => {
     const badge = document.getElementById("maint-status-badge");
     if (btn) btn.dataset.active = active ? "true" : "false";
     if (badge) {
-      badge.textContent = active ? "ACTIVO" : "OFF";
+      badge.textContent = active ? "ACTIVE" : "OFF";
       badge.className = `badge-maint ${active ? "on" : "off"}`;
     }
   }
@@ -771,7 +771,7 @@ const AdminApp = (() => {
   function copyText(text) {
     if (!navigator.clipboard) return;
     navigator.clipboard.writeText(text).then(() => {
-      showToast("Key copiada al portapapeles.", "info");
+      showToast("Key copied to clipboard.", "info");
     });
   }
 
@@ -780,7 +780,7 @@ const AdminApp = (() => {
     const loaderCode = `getgenv().Key = "${key}"\nloadstring(game:HttpGet("${baseUrl}/loader"))()`;
     if (!navigator.clipboard) return;
     navigator.clipboard.writeText(loaderCode).then(() => {
-      showToast("¡Script loader de Roblox copiado al portapapeles listo para usar!", "success");
+      showToast("Roblox loader snippet copied to clipboard!", "success");
     });
   }
 
@@ -799,7 +799,7 @@ const AdminApp = (() => {
     const btn = document.getElementById("btn-toggle-autorefresh");
     if (btn) {
       btn.classList.toggle("active-mode", isAutoRefreshOn);
-      btn.innerHTML = `<span class="live-dot" style="${isAutoRefreshOn ? '' : 'background: #64748b; box-shadow: none;'}"></span> Auto-refresh: ${isAutoRefreshOn ? 'ON (10s)' : 'PAUSADO'}`;
+      btn.innerHTML = `<span class="live-dot" style="${isAutoRefreshOn ? '' : 'background: #64748b; box-shadow: none;'}"></span> Auto-refresh: ${isAutoRefreshOn ? 'ON (10s)' : 'PAUSED'}`;
     }
   }
 
@@ -819,7 +819,12 @@ const AdminApp = (() => {
     // Password visibility toggle
     document.getElementById("btn-toggle-secret")?.addEventListener("click", () => {
       const input = document.getElementById("input-admin-secret");
-      if (input) input.type = input.type === "password" ? "text" : "password";
+      const btn = document.getElementById("btn-toggle-secret");
+      if (input) {
+        const isPassword = input.type === "password";
+        input.type = isPassword ? "text" : "password";
+        if (btn) btn.textContent = isPassword ? "🙈" : "👁️";
+      }
     });
 
     // Navigation Tabs
@@ -829,7 +834,7 @@ const AdminApp = (() => {
 
     // Manual Refresh
     document.getElementById("btn-manual-refresh")?.addEventListener("click", () => {
-      showToast("Actualizando datos...", "info");
+      showToast("Refreshing data...", "info");
       loadAllData();
     });
 
@@ -840,7 +845,7 @@ const AdminApp = (() => {
     document.getElementById("btn-toggle-autorefresh")?.addEventListener("click", toggleAutoRefresh);
     document.getElementById("btn-refresh-logs")?.addEventListener("click", () => {
       loadLogs();
-      showToast("Logs actualizados.", "info");
+      showToast("Logs refreshed.", "info");
     });
 
     // Keys Filters

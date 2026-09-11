@@ -1145,10 +1145,10 @@ function requireAdminAuth(req, res, next) {
 app.post("/api/admin/login", (req, res) => {
     const clientIp = (req.headers["x-forwarded-for"] || req.socket.remoteAddress || "").split(",")[0].trim();
     if (!checkAdminLoginRateLimit(clientIp)) {
-        return res.status(429).json({ error: "Too many failed attempts. Please try again in 15 minutes." });
+        return res.status(429).json({ error: "Too many failed attempts. Please try again in 5 minutes." });
     }
 
-    const secret = req.body.secret || req.body.password || "";
+    const secret = String(req.body.secret || req.body.password || "").trim();
     if (secret !== CONFIG.ADMIN_SECRET) {
         recordAdminFailedLogin(clientIp);
         return res.status(401).json({ error: "Invalid admin secret" });
@@ -1807,8 +1807,13 @@ app.get(["/favicon.ico", "/logo.png"], (req, res) => {
 });
 
 // 9.5 Admin Console Web Delivery
-app.use("/admin", express.static(path.join(__dirname, "admin")));
+app.use("/admin", express.static(path.join(__dirname, "admin"), {
+    maxAge: 0,
+    etag: true,
+    lastModified: true
+}));
 app.get(["/admin", "/admin/*"], (req, res) => {
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
     res.sendFile(path.join(__dirname, "admin", "index.html"));
 });
 

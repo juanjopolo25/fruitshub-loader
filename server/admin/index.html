@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
   <title>FruitsHub — Admin Console</title>
   <meta name="description" content="FruitsHub Private Master Administration & Analytics Console">
   <meta name="theme-color" content="#07090e">
@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="admin.css">
+  <link rel="stylesheet" href="admin.css?v=2">
 </head>
 <body>
 
@@ -24,11 +24,11 @@
       <div style="text-align: center; margin-bottom: 12px;">
         <img src="/assets/logo_128.png" alt="FruitsHub Logo" style="width: 44px; height: 44px; object-fit: contain; filter: drop-shadow(0 0 10px rgba(56, 189, 248, 0.5));">
       </div>
-      <div class="login-badge">SEGURIDAD RESTRINGIDA</div>
+      <div class="login-badge">RESTRICTED ACCESS</div>
       <h1 class="login-title">FruitsHub Admin</h1>
-      <p class="login-subtitle">Introduce tu clave secreta de administración para acceder a la consola.</p>
+      <p class="login-subtitle">Enter your master secret key to unlock the administration console.</p>
       
-      <form id="form-login" class="login-form">
+      <form id="form-login" class="login-form" novalidate autocomplete="off">
         <div class="form-group">
           <label for="input-admin-secret" class="form-label">ADMIN SECRET</label>
           <div class="password-wrap">
@@ -36,17 +36,20 @@
               type="password" 
               id="input-admin-secret" 
               class="form-input" 
-              placeholder="Introduce ADMIN_SECRET..." 
-              autocomplete="current-password" 
+              placeholder="Enter ADMIN_SECRET..." 
+              autocomplete="off" 
+              autocapitalize="none"
+              autocorrect="off"
+              spellcheck="false"
+              enterkeyhint="go"
               required
-              autofocus
             >
-            <button type="button" id="btn-toggle-secret" class="btn-input-icon" title="Mostrar/Ocultar clave">👁️</button>
+            <button type="button" id="btn-toggle-secret" class="btn-input-icon" title="Toggle secret visibility" aria-label="Toggle password visibility">👁️</button>
           </div>
         </div>
         <div id="login-error" class="alert-box alert-error hidden"></div>
         <button type="submit" id="btn-login-submit" class="btn btn-primary btn-block">
-          <span class="btn-text">Desbloquear Consola</span>
+          <span class="btn-text">Unlock Console</span>
           <span class="btn-spinner hidden"></span>
         </button>
       </form>
@@ -70,12 +73,12 @@
           <!-- Live Status Indicator -->
           <div class="status-chip" id="server-status-chip">
             <span class="status-pulse-dot"></span>
-            <span id="server-status-text">Conectado</span>
+            <span id="server-status-text">Connected</span>
           </div>
 
           <!-- Global Maintenance Switch -->
-          <div class="maintenance-toggle-wrap" title="Activar/Desactivar modo mantenimiento para Roblox">
-            <span class="maint-label">Mantenimiento:</span>
+          <div class="maintenance-toggle-wrap" title="Enable/Disable Roblox maintenance mode">
+            <span class="maint-label">Maintenance:</span>
             <button id="btn-toggle-maintenance" class="btn-switch" data-active="false">
               <span class="switch-ball"></span>
             </button>
@@ -83,14 +86,14 @@
           </div>
 
           <!-- Quick Refresh -->
-          <button id="btn-manual-refresh" class="btn btn-icon-secondary" title="Actualizar datos ahora">
+          <button id="btn-manual-refresh" class="btn btn-icon-secondary" title="Refresh data now">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
           </button>
 
           <!-- Logout Button -->
           <button id="btn-logout" class="btn btn-danger-ghost btn-sm">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
-            <span>Salir</span>
+            <span>Sign Out</span>
           </button>
         </div>
       </div>
@@ -101,23 +104,23 @@
       <div class="tabs-container">
         <button class="nav-tab active" data-tab="tab-overview">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9"></rect><rect x="14" y="3" width="7" height="5"></rect><rect x="14" y="12" width="7" height="9"></rect><rect x="3" y="16" width="7" height="5"></rect></svg>
-          <span>Métricas & Resumen</span>
+          <span>Overview</span>
         </button>
 
         <button class="nav-tab" data-tab="tab-keys">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2l-2 2m-1-1l-2 2m-7 7l7-7 4 4-7 7-4-4z"></path><circle cx="7.5" cy="16.5" r="4.5"></circle></svg>
-          <span>Gestión de Keys</span>
+          <span>Key Management</span>
           <span class="tab-badge" id="badge-total-keys">0</span>
         </button>
 
         <button class="nav-tab" data-tab="tab-executors">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10"></path><path d="M12 20V4"></path><path d="M6 20v-6"></path></svg>
-          <span>Analítica de Ejecutores</span>
+          <span>Executor Analytics</span>
         </button>
 
         <button class="nav-tab" data-tab="tab-logs">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
-          <span>Registro en Vivo</span>
+          <span>Live Logs</span>
         </button>
       </div>
     </nav>
@@ -134,9 +137,9 @@
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2l-2 2m-1-1l-2 2m-7 7l7-7 4 4-7 7-4-4z"></path><circle cx="7.5" cy="16.5" r="4.5"></circle></svg>
             </div>
             <div class="kpi-details">
-              <span class="kpi-label">Keys Totales</span>
+              <span class="kpi-label">Total Keys</span>
               <div class="kpi-value" id="kpi-total-keys">--</div>
-              <span class="kpi-subtext" id="kpi-keys-sub">Cargando datos...</span>
+              <span class="kpi-subtext" id="kpi-keys-sub">Loading metrics...</span>
             </div>
           </div>
 
@@ -145,9 +148,9 @@
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
             </div>
             <div class="kpi-details">
-              <span class="kpi-label">Keys Activas</span>
+              <span class="kpi-label">Active Keys</span>
               <div class="kpi-value green" id="kpi-active-keys">--</div>
-              <span class="kpi-subtext" id="kpi-active-sub">Válidas ahora mismo</span>
+              <span class="kpi-subtext" id="kpi-active-sub">Valid right now</span>
             </div>
           </div>
 
@@ -156,9 +159,9 @@
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
             </div>
             <div class="kpi-details">
-              <span class="kpi-label">Ejecuciones Hoy (24h)</span>
+              <span class="kpi-label">Executions Today (24h)</span>
               <div class="kpi-value purple" id="kpi-today-execs">--</div>
-              <span class="kpi-subtext">Cargas en últimas 24h</span>
+              <span class="kpi-subtext">Loads in last 24h</span>
             </div>
           </div>
 
@@ -167,9 +170,9 @@
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path></svg>
             </div>
             <div class="kpi-details">
-              <span class="kpi-label">Total Ejecuciones Históricas</span>
+              <span class="kpi-label">All-Time Executions</span>
               <div class="kpi-value amber" id="kpi-total-execs">--</div>
-              <span class="kpi-subtext">Todas las cargas acumuladas</span>
+              <span class="kpi-subtext">Total accumulated script loads</span>
             </div>
           </div>
         </div>
@@ -180,13 +183,13 @@
           <div class="panel-card">
             <div class="card-header">
               <div class="card-title-group">
-                <h2 class="card-title">Top Ejecutores en Roblox</h2>
-                <span class="card-desc">Ejecutores más usados por los jugadores de FruitsHub</span>
+                <h2 class="card-title">Top Roblox Executors</h2>
+                <span class="card-desc">Most popular execution environments launching FruitsHub</span>
               </div>
-              <button class="btn btn-sm btn-secondary" onclick="AdminApp.switchTab('tab-executors')">Ver Todo &rarr;</button>
+              <button class="btn btn-sm btn-secondary" onclick="AdminApp.switchTab('tab-executors')">View All &rarr;</button>
             </div>
             <div id="overview-executors-list" class="ranking-list">
-              <div class="loading-state">Calculando estadísticas de ejecutores...</div>
+              <div class="loading-state">Calculating executor statistics...</div>
             </div>
           </div>
 
@@ -194,43 +197,43 @@
           <div class="panel-card">
             <div class="card-header">
               <div class="card-title-group">
-                <h2 class="card-title">Acciones Rápidas</h2>
-                <span class="card-desc">Operaciones comunes para control inmediato</span>
+                <h2 class="card-title">Quick Actions</h2>
+                <span class="card-desc">Common operations for immediate control</span>
               </div>
             </div>
 
             <div class="quick-actions-box">
-              <button class="quick-action-btn" onclick="AdminApp.openCreateModal(24, '24h', 'Key de 24 Horas')">
+              <button class="quick-action-btn" onclick="AdminApp.openCreateModal(24, '24h', '24-Hour Key')">
                 <div class="action-btn-icon cyan">+24h</div>
                 <div class="action-btn-text">
-                  <strong>Crear Key 24 Horas</strong>
-                  <span>Genera una key válida por un día</span>
+                  <strong>Create 24-Hour Key</strong>
+                  <span>Generates a key valid for 1 day</span>
                 </div>
               </button>
 
-              <button class="quick-action-btn" onclick="AdminApp.openCreateModal(168, '7d', 'Key Semanal')">
+              <button class="quick-action-btn" onclick="AdminApp.openCreateModal(168, '7d', '7-Day Key')">
                 <div class="action-btn-icon green">+7d</div>
                 <div class="action-btn-text">
-                  <strong>Crear Key Semanal (7 días)</strong>
-                  <span>Acceso extendido para usuarios VIP</span>
+                  <strong>Create 7-Day Key (Weekly)</strong>
+                  <span>Extended access for VIP users</span>
                 </div>
               </button>
 
-              <button class="quick-action-btn" onclick="AdminApp.openCreateModal(-1, 'permanent', 'Key Permanente')">
+              <button class="quick-action-btn" onclick="AdminApp.openCreateModal(-1, 'permanent', 'Lifetime Key')">
                 <div class="action-btn-icon amber">∞</div>
                 <div class="action-btn-text">
-                  <strong>Crear Key Permanente (Lifetime)</strong>
-                  <span>Acceso sin fecha de caducidad</span>
+                  <strong>Create Lifetime Key (Permanent)</strong>
+                  <span>Access without expiration date</span>
                 </div>
               </button>
 
               <div class="server-info-strip">
                 <div class="info-item">
-                  <span class="info-name">Versión Activa:</span>
+                  <span class="info-name">Active Version:</span>
                   <span class="info-val" id="overview-script-ver">v1.0.1</span>
                 </div>
                 <div class="info-item">
-                  <span class="info-name">Base de Datos:</span>
+                  <span class="info-name">Database:</span>
                   <span class="info-val green">Turso Cloud LibSQL</span>
                 </div>
                 <div class="info-item">
@@ -256,7 +259,7 @@
                 type="text" 
                 id="filter-search" 
                 class="form-input search-input" 
-                placeholder="Buscar por key, HWID, Discord o nota..."
+                placeholder="Search by key, HWID, Discord or note..."
               >
               <button id="btn-clear-search" class="btn-clear-input hidden">&times;</button>
             </div>
@@ -264,26 +267,26 @@
             <div class="filter-controls-group">
               <!-- Status Filter -->
               <select id="filter-status" class="form-select">
-                <option value="all">Todos los Estados</option>
-                <option value="active">Solo Activas</option>
-                <option value="expired">Solo Expiradas</option>
-                <option value="revoked">Solo Revocadas</option>
+                <option value="all">All Statuses</option>
+                <option value="active">Active Only</option>
+                <option value="expired">Expired Only</option>
+                <option value="revoked">Revoked Only</option>
               </select>
 
               <!-- Tier Filter -->
               <select id="filter-tier" class="form-select">
-                <option value="all">Todos los Tiers</option>
-                <option value="24h">24 Horas</option>
-                <option value="7d">7 Días</option>
-                <option value="30d">30 Días</option>
-                <option value="permanent">Permanente</option>
+                <option value="all">All Tiers</option>
+                <option value="24h">24 Hours</option>
+                <option value="7d">7 Days</option>
+                <option value="30d">30 Days</option>
+                <option value="permanent">Lifetime</option>
                 <option value="admin">Admin</option>
               </select>
 
               <!-- Create Key Button -->
               <button class="btn btn-primary" onclick="AdminApp.openCreateModal()">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                <span>Nueva Key</span>
+                <span>New Key</span>
               </button>
             </div>
           </div>
@@ -294,17 +297,17 @@
               <thead>
                 <tr>
                   <th>Key</th>
-                  <th>Discord / Nota</th>
+                  <th>Discord / Note</th>
                   <th>Tier</th>
-                  <th>Ejecuciones</th>
-                  <th>HWID Vinculado</th>
-                  <th>Expiración / Estado</th>
-                  <th class="text-right">Acciones</th>
+                  <th>Executions</th>
+                  <th>Bound HWID</th>
+                  <th>Expiry / Status</th>
+                  <th class="text-right">Actions</th>
                 </tr>
               </thead>
               <tbody id="tbody-keys">
                 <tr>
-                  <td colspan="7" class="text-center py-6">Cargando lista de keys...</td>
+                  <td colspan="7" class="text-center py-6">Loading keys...</td>
                 </tr>
               </tbody>
             </table>
@@ -312,11 +315,11 @@
 
           <!-- Pagination Bar -->
           <div class="pagination-bar">
-            <span class="pagination-info" id="pagination-info">Mostrando 0 de 0 keys</span>
+            <span class="pagination-info" id="pagination-info">Showing 0 of 0 keys</span>
             <div class="pagination-buttons">
-              <button id="btn-page-prev" class="btn btn-secondary btn-sm" disabled>&larr; Anterior</button>
+              <button id="btn-page-prev" class="btn btn-secondary btn-sm" disabled>&larr; Prev</button>
               <span class="page-current" id="page-current-number">1</span>
-              <button id="btn-page-next" class="btn btn-secondary btn-sm" disabled>Siguiente &rarr;</button>
+              <button id="btn-page-next" class="btn btn-secondary btn-sm" disabled>Next &rarr;</button>
             </div>
           </div>
 
@@ -328,13 +331,13 @@
         <div class="panel-card">
           <div class="card-header">
             <div class="card-title-group">
-              <h2 class="card-title">Distribución y Analítica de Ejecutores</h2>
-              <span class="card-desc">Análisis detallado de qué clientes o ejecutores de Roblox lanzan FruitsHub</span>
+              <h2 class="card-title">Executor Distribution & Analytics</h2>
+              <span class="card-desc">Detailed breakdown of Roblox client execution environments running FruitsHub</span>
             </div>
             <div class="time-filter-pills">
-              <button class="pill-btn active" data-range="all">Todo el Tiempo</button>
-              <button class="pill-btn" data-range="7d">Últimos 7 días</button>
-              <button class="pill-btn" data-range="24h">Últimas 24 horas</button>
+              <button class="pill-btn active" data-range="all">All Time</button>
+              <button class="pill-btn" data-range="7d">Last 7 Days</button>
+              <button class="pill-btn" data-range="24h">Last 24 Hours</button>
             </div>
           </div>
 
@@ -349,14 +352,14 @@
               <table class="data-table">
                 <thead>
                   <tr>
-                    <th>Ejecutor</th>
-                    <th>Ejecuciones Registradas</th>
-                    <th>Porcentaje</th>
-                    <th>Última Detección</th>
+                    <th>Executor</th>
+                    <th>Recorded Executions</th>
+                    <th>Share</th>
+                    <th>Last Seen</th>
                   </tr>
                 </thead>
                 <tbody id="tbody-executors-detail">
-                  <tr><td colspan="4" class="text-center py-6">Cargando datos de ejecutores...</td></tr>
+                  <tr><td colspan="4" class="text-center py-6">Loading executor telemetry...</td></tr>
                 </tbody>
               </table>
             </div>
@@ -369,14 +372,14 @@
         <div class="panel-card">
           <div class="card-header">
             <div class="card-title-group">
-              <h2 class="card-title">Registro de Ejecuciones en Vivo</h2>
-              <span class="card-desc">Últimos 50 eventos de carga del script en tiempo real</span>
+              <h2 class="card-title">Live Execution Stream</h2>
+              <span class="card-desc">Real-time feed of the latest 50 script load telemetry events</span>
             </div>
             <div class="logs-header-actions">
               <button id="btn-toggle-autorefresh" class="btn btn-sm btn-secondary active-mode">
                 <span class="live-dot"></span> Auto-refresh: ON (10s)
               </button>
-              <button id="btn-refresh-logs" class="btn btn-sm btn-secondary">Actualizar</button>
+              <button id="btn-refresh-logs" class="btn btn-sm btn-secondary">Refresh</button>
             </div>
           </div>
 
@@ -384,16 +387,16 @@
             <table class="data-table">
               <thead>
                 <tr>
-                  <th>Fecha y Hora</th>
-                  <th>Key Usada</th>
-                  <th>Ejecutor Detectado</th>
-                  <th>HWID Dispositivo</th>
-                  <th>IP (Ofuscada)</th>
-                  <th>Resultado</th>
+                  <th>Timestamp</th>
+                  <th>Key Used</th>
+                  <th>Detected Executor</th>
+                  <th>Device HWID</th>
+                  <th>IP Address</th>
+                  <th>Status</th>
                 </tr>
               </thead>
               <tbody id="tbody-logs">
-                <tr><td colspan="6" class="text-center py-6">Cargando feed de eventos...</td></tr>
+                <tr><td colspan="6" class="text-center py-6">Loading event stream...</td></tr>
               </tbody>
             </table>
           </div>
@@ -407,47 +410,47 @@
   <div id="modal-create-key" class="modal-backdrop hidden">
     <div class="modal-dialog">
       <div class="modal-header">
-        <h3 class="modal-title">Generar Nueva Key</h3>
+        <h3 class="modal-title">Generate New Key</h3>
         <button class="modal-close-btn" onclick="AdminApp.closeModals()">&times;</button>
       </div>
       <form id="form-create-key" class="modal-body">
         <div class="form-group">
-          <label class="form-label">Duración / Validez</label>
+          <label class="form-label">Duration / Validity</label>
           <select id="modal-create-duration" class="form-select">
-            <option value="24">24 Horas (1 Día)</option>
-            <option value="72">72 Horas (3 Días)</option>
-            <option value="168">7 Días (1 Semana)</option>
-            <option value="720">30 Días (1 Mes)</option>
-            <option value="-1">Permanente / Lifetime</option>
+            <option value="24">24 Hours (1 Day)</option>
+            <option value="72">72 Hours (3 Days)</option>
+            <option value="168">7 Days (1 Week)</option>
+            <option value="720">30 Days (1 Month)</option>
+            <option value="-1">Lifetime / Permanent</option>
           </select>
         </div>
 
         <div class="form-group">
-          <label class="form-label">Nivel de Acceso (Tier)</label>
+          <label class="form-label">Access Level (Tier)</label>
           <select id="modal-create-tier" class="form-select">
             <option value="24h">Standard (24h)</option>
             <option value="vip">VIP</option>
             <option value="premium">Premium</option>
-            <option value="permanent">Permanente</option>
+            <option value="permanent">Lifetime</option>
             <option value="admin">Admin</option>
           </select>
         </div>
 
         <div class="form-group">
-          <label class="form-label">Nota o Dueño (Opcional)</label>
-          <input type="text" id="modal-create-note" class="form-input" placeholder="Ej: Para sorteo Discord, Amigo Pedro...">
+          <label class="form-label">Note / Owner (Optional)</label>
+          <input type="text" id="modal-create-note" class="form-input" placeholder="e.g. Discord giveaway, Team member...">
         </div>
 
         <div class="form-group">
-          <label class="form-label">Cantidad a Generar</label>
+          <label class="form-label">Quantity to Generate</label>
           <input type="number" id="modal-create-count" class="form-input" min="1" max="20" value="1">
-          <small class="form-hint">Puedes generar de 1 a 20 keys de golpe.</small>
+          <small class="form-hint">You can batch-generate 1 to 20 keys at once.</small>
         </div>
 
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" onclick="AdminApp.closeModals()">Cancelar</button>
+          <button type="button" class="btn btn-secondary" onclick="AdminApp.closeModals()">Cancel</button>
           <button type="submit" id="btn-submit-create" class="btn btn-primary">
-            <span>Generar Key(s)</span>
+            <span>Generate Key(s)</span>
           </button>
         </div>
       </form>
@@ -458,7 +461,7 @@
   <div id="modal-extend-key" class="modal-backdrop hidden">
     <div class="modal-dialog">
       <div class="modal-header">
-        <h3 class="modal-title">Extender Duración de Key</h3>
+        <h3 class="modal-title">Extend Key Duration</h3>
         <button class="modal-close-btn" onclick="AdminApp.closeModals()">&times;</button>
       </div>
       <form id="form-extend-key" class="modal-body">
@@ -466,19 +469,19 @@
         <p class="mb-4 text-secondary text-sm">Key: <code id="modal-extend-key-display" class="font-mono text-cyan"></code></p>
         
         <div class="form-group">
-          <label class="form-label">Tiempo Adicional a Sumar</label>
+          <label class="form-label">Additional Time to Add</label>
           <select id="modal-extend-hours" class="form-select">
-            <option value="24">+24 Horas (1 Día)</option>
-            <option value="72">+3 Días</option>
-            <option value="168">+7 Días (1 Semana)</option>
-            <option value="720">+30 Días (1 Mes)</option>
-            <option value="perm">Convertir en Permanente (Lifetime)</option>
+            <option value="24">+24 Hours (1 Day)</option>
+            <option value="72">+3 Days</option>
+            <option value="168">+7 Days (1 Week)</option>
+            <option value="720">+30 Days (1 Month)</option>
+            <option value="perm">Convert to Lifetime (Permanent)</option>
           </select>
         </div>
 
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" onclick="AdminApp.closeModals()">Cancelar</button>
-          <button type="submit" class="btn btn-primary">Guardar Extensión</button>
+          <button type="button" class="btn btn-secondary" onclick="AdminApp.closeModals()">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Extension</button>
         </div>
       </form>
     </div>
@@ -488,6 +491,6 @@
   <div id="toast-container" class="toast-container"></div>
 
   <!-- Dashboard JavaScript Application -->
-  <script src="admin.js"></script>
+  <script src="admin.js?v=2"></script>
 </body>
 </html>

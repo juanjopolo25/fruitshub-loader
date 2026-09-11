@@ -98,7 +98,9 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
+  padding: 16px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   z-index: 9999;
 }
 .login-overlay.hidden {
@@ -115,6 +117,7 @@ body {
   box-shadow: var(--shadow-card);
   text-align: center;
   position: relative;
+  margin: auto;
 }
 .login-badge {
   display: inline-block;
@@ -970,16 +973,25 @@ body {
 }
 .btn-input-icon {
   position: absolute;
-  right: 10px;
+  right: 4px;
   top: 50%;
   transform: translateY(-50%);
   background: none;
   border: none;
   cursor: pointer;
-  font-size: 1rem;
-  opacity: 0.7;
+  font-size: 1.15rem;
+  opacity: 0.75;
+  width: 42px;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: manipulation;
 }
-.btn-input-icon:hover { opacity: 1; }
+.btn-input-icon:hover, .btn-input-icon:focus {
+  opacity: 1;
+  outline: none;
+}
 
 .btn {
   display: inline-flex;
@@ -1059,7 +1071,9 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
+  padding: 16px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   z-index: 999;
 }
 .modal-backdrop.hidden { display: none !important; }
@@ -1073,6 +1087,7 @@ body {
   box-shadow: var(--shadow-card);
   animation: modalIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   overflow: hidden;
+  margin: auto;
 }
 @keyframes modalIn {
   from { opacity: 0; transform: scale(0.95); }
@@ -1173,4 +1188,196 @@ body {
   color: var(--text-tertiary);
   font-family: var(--font-mono);
   font-size: 0.85rem;
+}
+
+/* ==================== RESPONSIVE DESIGN & MOBILE OPTIMIZATIONS ==================== */
+
+/* Prevent iOS Safari forced auto-zoom on any text inputs */
+@media (max-width: 768px) {
+  .form-input,
+  .form-select,
+  input[type="text"],
+  input[type="password"],
+  input[type="number"],
+  input[type="search"],
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+
+  .admin-header {
+    position: relative;
+    top: auto;
+  }
+  .header-container {
+    padding: 10px 14px;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .brand-section,
+  .brand-divider {
+    display: none;
+  }
+  .brand-name {
+    font-size: 0.95rem;
+  }
+  .header-controls {
+    gap: 8px;
+    margin-left: auto;
+  }
+  .status-chip {
+    padding: 4px 8px;
+    font-size: 0.7rem;
+  }
+  .maintenance-toggle-wrap {
+    padding: 3px 8px;
+    gap: 6px;
+  }
+  .maintenance-toggle-wrap .maint-label {
+    display: none;
+  }
+
+  .nav-tabs-bar {
+    position: sticky;
+    top: 0;
+    z-index: 90;
+  }
+  .tabs-container {
+    padding: 0 10px;
+    gap: 4px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .tabs-container::-webkit-scrollbar {
+    display: none;
+  }
+  .nav-tab {
+    padding: 10px 12px;
+    font-size: 0.8rem;
+    gap: 6px;
+  }
+
+  .admin-main {
+    margin: 14px auto 40px;
+    padding: 0 12px;
+  }
+  .panel-card {
+    padding: 16px;
+    border-radius: var(--radius-md);
+  }
+  .card-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .card-title {
+    font-size: 1.05rem;
+  }
+
+  .kpi-grid {
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .kpi-card {
+    padding: 14px;
+    gap: 12px;
+  }
+  .kpi-icon-box {
+    width: 38px;
+    height: 38px;
+  }
+  .kpi-value {
+    font-size: 1.4rem;
+  }
+
+  .keys-control-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .search-input-wrap {
+    width: 100%;
+    flex: 1 1 100%;
+  }
+  .filter-controls-group {
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .filter-controls-group .form-select {
+    flex: 1 1 calc(50% - 4px);
+    min-width: 130px;
+  }
+  .filter-controls-group .btn {
+    flex: 1 1 100%;
+  }
+
+  .pagination-bar {
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    text-align: center;
+  }
+
+  .toast-container {
+    left: 14px;
+    right: 14px;
+    bottom: 16px;
+  }
+  .toast {
+    max-width: 100%;
+    width: 100%;
+  }
+}
+
+/* Specific small mobile adjustments (phones) */
+@media (max-width: 480px) {
+  .login-overlay {
+    padding: 12px;
+    align-items: flex-start;
+  }
+  .login-card {
+    padding: 24px 18px;
+    border-radius: var(--radius-lg);
+    margin: 20px auto 40px auto;
+  }
+  .login-title {
+    font-size: 1.3rem;
+  }
+  .login-subtitle {
+    font-size: 0.82rem;
+    margin-bottom: 20px;
+  }
+  .login-badge {
+    font-size: 0.68rem;
+    padding: 3px 8px;
+    margin-bottom: 14px;
+  }
+  .form-group {
+    margin-bottom: 14px;
+  }
+
+  .modal-backdrop {
+    padding: 10px;
+    align-items: flex-start;
+  }
+  .modal-dialog {
+    margin: 20px auto 40px auto;
+    border-radius: var(--radius-lg);
+  }
+  .modal-header {
+    padding: 14px 18px;
+  }
+  .modal-body {
+    padding: 16px 18px;
+  }
+  .modal-footer {
+    flex-direction: column-reverse;
+    gap: 8px;
+  }
+  .modal-footer .btn {
+    width: 100%;
+  }
 }
