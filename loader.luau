@@ -31,11 +31,13 @@ local VerPath = "FruitsHub/version_v2.txt"
 
 -- Purge stale legacy v1 cache if present on disk
 pcall(function()
-    if isfile and isfile("FruitsHub/cache_v1.luau") and delfile then
-        delfile("FruitsHub/cache_v1.luau")
+    if isfile and isfile("FruitsHub/cache_v1.luau") then
+        if writefile then writefile("FruitsHub/cache_v1.luau", "") end
+        if delfile then delfile("FruitsHub/cache_v1.luau") end
     end
-    if isfile and isfile("FruitsHub/version.txt") and delfile then
-        delfile("FruitsHub/version.txt")
+    if isfile and isfile("FruitsHub/version.txt") then
+        if writefile then writefile("FruitsHub/version.txt", "") end
+        if delfile then delfile("FruitsHub/version.txt") end
     end
 end)
 
