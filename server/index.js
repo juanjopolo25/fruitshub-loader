@@ -847,7 +847,7 @@ if isKeyNeeded then
     getKeyBtn.Position = UDim2.new(0, 0, 0, 38)
     getKeyBtn.BackgroundColor3 = Color3.fromRGB(24, 30, 42)
     getKeyBtn.BorderSizePixel = 0
-    getKeyBtn.Text = "Get Key (Copy Gateway Link)  ↗"
+    getKeyBtn.Text = "Get Key"
     getKeyBtn.Font = Enum.Font.GothamMedium
     getKeyBtn.TextSize = 11
     getKeyBtn.TextColor3 = Color3.fromRGB(226, 232, 240)
@@ -882,7 +882,7 @@ if isKeyNeeded then
             getKeyStroke.Color = Color3.fromRGB(34, 197, 94)
             task.delay(2.5, function()
                 if getKeyBtn and getKeyBtn.Parent then
-                    getKeyBtn.Text = "Get Key (Copy Gateway Link)  ↗"
+                    getKeyBtn.Text = "Get Key"
                     getKeyBtn.TextColor3 = Color3.fromRGB(226, 232, 240)
                     getKeyStroke.Color = Color3.fromRGB(45, 55, 72)
                     isCopied = false
