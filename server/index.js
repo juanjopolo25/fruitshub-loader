@@ -668,12 +668,12 @@ backdrop.Parent = gui
 --// Main Modal Card
 local isKeyNeeded = (keyUrl ~= "")
 local isHwidReset = (keyUrl ~= nil and tostring(keyUrl):find("/reset%-hwid") ~= nil)
-local cardHeight = isKeyNeeded and 280 or 150
+local cardHeight = isKeyNeeded and 286 or 150
 local card = Instance.new("Frame")
 card.Name = "Card"
 card.AnchorPoint = Vector2.new(0.5, 0.5)
 card.Position = UDim2.new(0.5, 0, 0.5, 0)
-card.Size = UDim2.new(0, 420, 0, cardHeight)
+card.Size = UDim2.new(0, 440, 0, cardHeight)
 card.BackgroundColor3 = Color3.fromRGB(11, 14, 20)
 card.BorderSizePixel = 0
 card.ClipsDescendants = true
@@ -684,7 +684,7 @@ cardCorner.CornerRadius = UDim.new(0, 8)
 cardCorner.Parent = card
 
 local cardStroke = Instance.new("UIStroke")
-cardStroke.Color = Color3.fromRGB(30, 38, 54)
+cardStroke.Color = Color3.fromRGB(30, 41, 59)
 cardStroke.Thickness = 1
 cardStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 cardStroke.Parent = card
@@ -795,7 +795,7 @@ local brand = Instance.new("TextLabel")
 brand.Name = "Brand"
 brand.Text = "FRUITSHUB"
 brand.Font = Enum.Font.GothamBold
-brand.TextSize = 14
+brand.TextSize = 13
 brand.TextColor3 = Color3.fromRGB(56, 189, 248)
 brand.TextXAlignment = Enum.TextXAlignment.Left
 brand.BackgroundTransparency = 1
@@ -807,9 +807,9 @@ brand.Parent = header
 -- Badge Tag
 local badge = Instance.new("Frame")
 badge.Name = "Badge"
-badge.Size = UDim2.new(0, isHwidReset and 110 or 92, 0, 20)
+badge.Size = UDim2.new(0, isHwidReset and 110 or 86, 0, 20)
 badge.Position = UDim2.new(0, 136, 0.5, -10)
-badge.BackgroundColor3 = isHwidReset and Color3.fromRGB(38, 26, 12) or Color3.fromRGB(18, 22, 32)
+badge.BackgroundColor3 = isHwidReset and Color3.fromRGB(38, 26, 12) or Color3.fromRGB(18, 24, 36)
 badge.BorderSizePixel = 0
 badge.Parent = header
 
@@ -818,7 +818,7 @@ badgeCorner.CornerRadius = UDim.new(0, 4)
 badgeCorner.Parent = badge
 
 local badgeStroke = Instance.new("UIStroke")
-badgeStroke.Color = isHwidReset and Color3.fromRGB(245, 158, 11) or Color3.fromRGB(30, 38, 54)
+badgeStroke.Color = isHwidReset and Color3.fromRGB(245, 158, 11) or Color3.fromRGB(30, 44, 66)
 badgeStroke.Thickness = 1
 badgeStroke.Parent = badge
 
@@ -832,14 +832,14 @@ badgeText.TextColor3 = isHwidReset and Color3.fromRGB(251, 191, 36) or Color3.fr
 badgeText.AutoLocalize = false
 badgeText.Parent = badge
 
--- Close Button ("✕")
+-- Close Button (ASCII "X" prevents Roblox missing glyph box ▯)
 local closeBtn = Instance.new("TextButton")
 closeBtn.Name = "CloseBtn"
 closeBtn.Size = UDim2.fromOffset(24, 24)
 closeBtn.Position = UDim2.new(1, -38, 0.5, -12)
 closeBtn.BackgroundColor3 = Color3.fromRGB(18, 22, 32)
 closeBtn.BorderSizePixel = 0
-closeBtn.Text = "✕"
+closeBtn.Text = "X"
 closeBtn.Font = Enum.Font.GothamBold
 closeBtn.TextSize = 11
 closeBtn.TextColor3 = Color3.fromRGB(148, 163, 184)
@@ -869,17 +869,17 @@ end)
 -- Content Frame
 local content = Instance.new("Frame")
 content.Name = "Content"
-content.Position = UDim2.new(0, 14, 0, 48)
-content.Size = UDim2.new(1, -28, 1, -54)
+content.Position = UDim2.new(0, 14, 0, 46)
+content.Size = UDim2.new(1, -28, 1, -52)
 content.BackgroundTransparency = 1
 content.Parent = card
 
 -- Notice Banner
 local banner = Instance.new("Frame")
 banner.Name = "Banner"
-banner.Size = UDim2.new(1, 0, 0, 34)
+banner.Size = UDim2.new(1, 0, 0, 32)
 banner.Position = UDim2.new(0, 0, 0, 0)
-banner.BackgroundColor3 = Color3.fromRGB(18, 22, 32)
+banner.BackgroundColor3 = Color3.fromRGB(16, 21, 30)
 banner.BorderSizePixel = 0
 banner.Parent = content
 
@@ -888,7 +888,7 @@ bCorner.CornerRadius = UDim.new(0, 6)
 bCorner.Parent = banner
 
 local bStroke = Instance.new("UIStroke")
-bStroke.Color = isHwidReset and Color3.fromRGB(120, 75, 15) or Color3.fromRGB(30, 38, 54)
+bStroke.Color = isHwidReset and Color3.fromRGB(120, 75, 15) or Color3.fromRGB(30, 42, 60)
 bStroke.Thickness = 1
 bStroke.Parent = banner
 
@@ -911,8 +911,8 @@ bText.TextColor3 = Color3.fromRGB(203, 213, 225)
 bText.TextXAlignment = Enum.TextXAlignment.Left
 bText.BackgroundTransparency = 1
 bText.AutoLocalize = false
-bText.Position = UDim2.new(0, 16, 0, 0)
-bText.Size = UDim2.new(1, -20, 1, 0)
+bText.Position = UDim2.new(0, 18, 0, 0)
+bText.Size = UDim2.new(1, -24, 1, 0)
 bText.Parent = banner
 
 if isKeyNeeded then
@@ -920,8 +920,8 @@ if isKeyNeeded then
     local getKeyBtn = Instance.new("TextButton")
     getKeyBtn.Name = "GetKeyBtn"
     getKeyBtn.Size = UDim2.new(1, 0, 0, 34)
-    getKeyBtn.Position = UDim2.new(0, 0, 0, 44)
-    getKeyBtn.BackgroundColor3 = isHwidReset and Color3.fromRGB(38, 28, 14) or Color3.fromRGB(20, 26, 38)
+    getKeyBtn.Position = UDim2.new(0, 0, 0, 40)
+    getKeyBtn.BackgroundColor3 = isHwidReset and Color3.fromRGB(38, 28, 14) or Color3.fromRGB(18, 24, 36)
     getKeyBtn.BorderSizePixel = 0
     getKeyBtn.Text = isHwidReset and "Reset Device HWID" or "Get Key"
     getKeyBtn.Font = Enum.Font.GothamBold
@@ -936,25 +936,25 @@ if isKeyNeeded then
     getKeyCorner.Parent = getKeyBtn
 
     local getKeyStroke = Instance.new("UIStroke")
-    getKeyStroke.Color = isHwidReset and Color3.fromRGB(180, 110, 15) or Color3.fromRGB(40, 50, 72)
+    getKeyStroke.Color = isHwidReset and Color3.fromRGB(180, 110, 15) or Color3.fromRGB(36, 48, 70)
     getKeyStroke.Thickness = 1
     getKeyStroke.Parent = getKeyBtn
 
     getKeyBtn.MouseEnter:Connect(function()
-        TweenService:Create(getKeyBtn, TweenInfo.new(0.15), { BackgroundColor3 = isHwidReset and Color3.fromRGB(55, 38, 18) or Color3.fromRGB(30, 40, 60) }):Play()
+        TweenService:Create(getKeyBtn, TweenInfo.new(0.15), { BackgroundColor3 = isHwidReset and Color3.fromRGB(55, 38, 18) or Color3.fromRGB(28, 38, 58) }):Play()
         TweenService:Create(getKeyStroke, TweenInfo.new(0.15), { Color = isHwidReset and Color3.fromRGB(245, 158, 11) or Color3.fromRGB(56, 189, 248) }):Play()
     end)
     getKeyBtn.MouseLeave:Connect(function()
-        TweenService:Create(getKeyBtn, TweenInfo.new(0.15), { BackgroundColor3 = isHwidReset and Color3.fromRGB(38, 28, 14) or Color3.fromRGB(20, 26, 38) }):Play()
-        TweenService:Create(getKeyStroke, TweenInfo.new(0.15), { Color = isHwidReset and Color3.fromRGB(180, 110, 15) or Color3.fromRGB(40, 50, 72) }):Play()
+        TweenService:Create(getKeyBtn, TweenInfo.new(0.15), { BackgroundColor3 = isHwidReset and Color3.fromRGB(38, 28, 14) or Color3.fromRGB(18, 24, 36) }):Play()
+        TweenService:Create(getKeyStroke, TweenInfo.new(0.15), { Color = isHwidReset and Color3.fromRGB(180, 110, 15) or Color3.fromRGB(36, 48, 70) }):Play()
     end)
 
     -- Key Input Box
     local keyBox = Instance.new("TextBox")
     keyBox.Name = "KeyBox"
     keyBox.Size = UDim2.new(1, 0, 0, 36)
-    keyBox.Position = UDim2.new(0, 0, 0, 88)
-    keyBox.BackgroundColor3 = Color3.fromRGB(14, 17, 24)
+    keyBox.Position = UDim2.new(0, 0, 0, 82)
+    keyBox.BackgroundColor3 = Color3.fromRGB(13, 16, 23)
     keyBox.BorderSizePixel = 0
     keyBox.PlaceholderText = "Paste your key here (FH-...)"
     keyBox.PlaceholderColor3 = Color3.fromRGB(90, 105, 125)
@@ -976,7 +976,7 @@ if isKeyNeeded then
     keyBoxCorner.Parent = keyBox
 
     local keyBoxStroke = Instance.new("UIStroke")
-    keyBoxStroke.Color = Color3.fromRGB(30, 38, 54)
+    keyBoxStroke.Color = Color3.fromRGB(30, 40, 58)
     keyBoxStroke.Thickness = 1
     keyBoxStroke.Parent = keyBox
 
@@ -984,7 +984,7 @@ if isKeyNeeded then
         TweenService:Create(keyBoxStroke, TweenInfo.new(0.15), { Color = Color3.fromRGB(56, 189, 248) }):Play()
     end)
     keyBox.FocusLost:Connect(function()
-        TweenService:Create(keyBoxStroke, TweenInfo.new(0.15), { Color = Color3.fromRGB(30, 38, 54) }):Play()
+        TweenService:Create(keyBoxStroke, TweenInfo.new(0.15), { Color = Color3.fromRGB(30, 40, 58) }):Play()
     end)
 
     -- Pre-fill if saved locally
@@ -995,83 +995,11 @@ if isKeyNeeded then
         end
     end)
 
-    -- Status Feedback Label
-    local statusLbl = Instance.new("TextLabel")
-    statusLbl.Name = "StatusLbl"
-    statusLbl.Size = UDim2.new(1, 0, 0, 18)
-    statusLbl.Position = UDim2.new(0, 0, 0, 178)
-    statusLbl.BackgroundTransparency = 1
-    statusLbl.Text = isHwidReset and "Click 'Reset Device HWID' to copy your unlock link." or "Click 'Get Key' to copy the checkpoint link to your clipboard."
-    statusLbl.Font = Enum.Font.GothamMedium
-    statusLbl.TextSize = 10
-    statusLbl.TextColor3 = isHwidReset and Color3.fromRGB(251, 191, 36) or Color3.fromRGB(148, 163, 184)
-    statusLbl.TextXAlignment = Enum.TextXAlignment.Center
-    statusLbl.TextTruncate = Enum.TextTruncate.AtEnd
-    statusLbl.AutoLocalize = false
-    statusLbl.Parent = content
-
-    local isCopied = false
-    getKeyBtn.MouseButton1Click:Connect(function()
-        local copied = false
-        if setclipboard then
-            pcall(function() setclipboard(keyUrl) end)
-            copied = true
-        elseif toclipboard then
-            pcall(function() toclipboard(keyUrl) end)
-            copied = true
-        end
-        pcall(function()
-            StarterGui:SetCore("SendNotification", {
-                Title = "FruitsHub",
-                Text = isHwidReset and "Reset link copied to clipboard!" or "Key link copied to clipboard!",
-                Duration = 3
-            })
-        end)
-        if copied then
-            if isHwidReset then
-                statusLbl.Text = "✓ HWID reset link copied! Complete the quick step in your browser."
-                statusLbl.TextColor3 = Color3.fromRGB(251, 191, 36)
-            else
-                statusLbl.Text = "✓ Gateway link copied to clipboard! Paste it in your browser."
-                statusLbl.TextColor3 = Color3.fromRGB(34, 197, 94)
-            end
-        else
-            statusLbl.Text = "Link: " .. keyUrl
-            statusLbl.TextColor3 = isHwidReset and Color3.fromRGB(251, 191, 36) or Color3.fromRGB(56, 189, 248)
-        end
-        if not isCopied then
-            isCopied = true
-            getKeyBtn.Text = isHwidReset and "Reset Link Copied! ✓" or "Link Copied to Clipboard! ✓"
-            getKeyBtn.TextColor3 = isHwidReset and Color3.fromRGB(251, 191, 36) or Color3.fromRGB(74, 222, 128)
-            getKeyStroke.Color = isHwidReset and Color3.fromRGB(245, 158, 11) or Color3.fromRGB(34, 197, 94)
-            task.delay(2.5, function()
-                if getKeyBtn and getKeyBtn.Parent then
-                    getKeyBtn.Text = isHwidReset and "Reset Device HWID" or "Get Key"
-                    getKeyBtn.TextColor3 = isHwidReset and Color3.fromRGB(251, 191, 36) or Color3.fromRGB(241, 245, 249)
-                    getKeyStroke.Color = isHwidReset and Color3.fromRGB(180, 110, 15) or Color3.fromRGB(40, 50, 72)
-                    isCopied = false
-                end
-            end)
-        end
-    end)
-
-    -- Auto-detect key from clipboard if starts with FH-
-    pcall(function()
-        if getclipboard then
-            local clip = tostring(getclipboard()):gsub("%s+", "")
-            if clip:sub(1, 3) == "FH-" and keyBox.Text == "" then
-                keyBox.Text = clip
-                statusLbl.Text = "Key detected from clipboard! Click Verify to launch."
-                statusLbl.TextColor3 = Color3.fromRGB(56, 189, 248)
-            end
-        end
-    end)
-
     -- Verify & Launch Button
     local submitBtn = Instance.new("TextButton")
     submitBtn.Name = "SubmitBtn"
     submitBtn.Size = UDim2.new(1, 0, 0, 36)
-    submitBtn.Position = UDim2.new(0, 0, 0, 134)
+    submitBtn.Position = UDim2.new(0, 0, 0, 126)
     submitBtn.BackgroundColor3 = Color3.fromRGB(56, 189, 248)
     submitBtn.BorderSizePixel = 0
     submitBtn.Text = "Verify & Launch FruitsHub"
@@ -1093,19 +1021,127 @@ if isKeyNeeded then
         TweenService:Create(submitBtn, TweenInfo.new(0.15), { BackgroundColor3 = Color3.fromRGB(56, 189, 248) }):Play()
     end)
 
+    -- Dedicated Status Feedback Container Pill (Prevents text from ever overflowing or spilling out)
+    local statusBox = Instance.new("Frame")
+    statusBox.Name = "StatusBox"
+    statusBox.Size = UDim2.new(1, 0, 0, 26)
+    statusBox.Position = UDim2.new(0, 0, 0, 170)
+    statusBox.BackgroundColor3 = Color3.fromRGB(14, 18, 26)
+    statusBox.BorderSizePixel = 0
+    statusBox.Parent = content
+
+    local statusCorner = Instance.new("UICorner")
+    statusCorner.CornerRadius = UDim.new(0, 6)
+    statusCorner.Parent = statusBox
+
+    local statusStroke = Instance.new("UIStroke")
+    statusStroke.Color = Color3.fromRGB(24, 32, 48)
+    statusStroke.Thickness = 1
+    statusStroke.Parent = statusBox
+
+    local statusLbl = Instance.new("TextLabel")
+    statusLbl.Name = "StatusLbl"
+    statusLbl.Size = UDim2.new(1, -16, 1, 0)
+    statusLbl.Position = UDim2.new(0, 8, 0, 0)
+    statusLbl.BackgroundTransparency = 1
+    statusLbl.Text = isHwidReset and "Click 'Reset Device HWID' to copy unlock link." or "Click 'Get Key' to copy the checkpoint link."
+    statusLbl.Font = Enum.Font.GothamMedium
+    statusLbl.TextSize = 10
+    statusLbl.TextColor3 = isHwidReset and Color3.fromRGB(251, 191, 36) or Color3.fromRGB(148, 163, 184)
+    statusLbl.TextXAlignment = Enum.TextXAlignment.Center
+    statusLbl.TextTruncate = Enum.TextTruncate.AtEnd
+    statusLbl.AutoLocalize = false
+    statusLbl.Parent = statusBox
+
+    local function setStatus(msgType, text)
+        statusLbl.Text = text
+        if msgType == "success" then
+            statusBox.BackgroundColor3 = Color3.fromRGB(12, 30, 22)
+            statusStroke.Color = Color3.fromRGB(34, 197, 94)
+            statusLbl.TextColor3 = Color3.fromRGB(74, 222, 128)
+        elseif msgType == "error" then
+            statusBox.BackgroundColor3 = Color3.fromRGB(32, 14, 18)
+            statusStroke.Color = Color3.fromRGB(239, 68, 68)
+            statusLbl.TextColor3 = Color3.fromRGB(248, 113, 113)
+        elseif msgType == "warning" then
+            statusBox.BackgroundColor3 = Color3.fromRGB(32, 24, 12)
+            statusStroke.Color = Color3.fromRGB(245, 158, 11)
+            statusLbl.TextColor3 = Color3.fromRGB(251, 191, 36)
+        elseif msgType == "info" then
+            statusBox.BackgroundColor3 = Color3.fromRGB(14, 24, 38)
+            statusStroke.Color = Color3.fromRGB(56, 189, 248)
+            statusLbl.TextColor3 = Color3.fromRGB(125, 211, 252)
+        else
+            statusBox.BackgroundColor3 = Color3.fromRGB(14, 18, 26)
+            statusStroke.Color = Color3.fromRGB(24, 32, 48)
+            statusLbl.TextColor3 = Color3.fromRGB(148, 163, 184)
+        end
+    end
+
+    local isCopied = false
+    getKeyBtn.MouseButton1Click:Connect(function()
+        local copied = false
+        if setclipboard then
+            pcall(function() setclipboard(keyUrl) end)
+            copied = true
+        elseif toclipboard then
+            pcall(function() toclipboard(keyUrl) end)
+            copied = true
+        end
+        pcall(function()
+            StarterGui:SetCore("SendNotification", {
+                Title = "FruitsHub",
+                Text = isHwidReset and "Reset link copied to clipboard!" or "Key link copied to clipboard!",
+                Duration = 3
+            })
+        end)
+        if copied then
+            if isHwidReset then
+                setStatus("warning", "✓ HWID reset link copied! Complete the quick step in your browser.")
+            else
+                setStatus("success", "✓ Gateway link copied to clipboard! Paste it in your browser.")
+            end
+        else
+            setStatus("info", "Link: " .. keyUrl)
+        end
+        if not isCopied then
+            isCopied = true
+            getKeyBtn.Text = isHwidReset and "Reset Link Copied! ✓" or "Link Copied to Clipboard! ✓"
+            getKeyBtn.TextColor3 = isHwidReset and Color3.fromRGB(251, 191, 36) or Color3.fromRGB(74, 222, 128)
+            getKeyStroke.Color = isHwidReset and Color3.fromRGB(245, 158, 11) or Color3.fromRGB(34, 197, 94)
+            task.delay(2.5, function()
+                if getKeyBtn and getKeyBtn.Parent then
+                    getKeyBtn.Text = isHwidReset and "Reset Device HWID" or "Get Key"
+                    getKeyBtn.TextColor3 = isHwidReset and Color3.fromRGB(251, 191, 36) or Color3.fromRGB(241, 245, 249)
+                    getKeyStroke.Color = isHwidReset and Color3.fromRGB(180, 110, 15) or Color3.fromRGB(36, 48, 70)
+                    isCopied = false
+                end
+            end)
+        end
+    end)
+
+    -- Auto-detect key from clipboard if starts with FH-
+    pcall(function()
+        if getclipboard then
+            local clip = tostring(getclipboard()):gsub("%s+", "")
+            if clip:sub(1, 3) == "FH-" and keyBox.Text == "" then
+                keyBox.Text = clip
+                setStatus("info", "Key detected from clipboard! Click Verify to launch.")
+            end
+        end
+    end)
+
     local isVerifying = false
     submitBtn.MouseButton1Click:Connect(function()
         if isVerifying then return end
         local rawKey = tostring(keyBox.Text):gsub("%s+", "")
         if rawKey == "" or rawKey == "PASTE_KEY_HERE" then
-            statusLbl.Text = "Please paste your key first"
-            statusLbl.TextColor3 = Color3.fromRGB(248, 113, 113)
+            setStatus("error", "Please paste your key first.")
             return
         end
 
         isVerifying = true
-        statusLbl.Text = "Contacting gateway..."
-        statusLbl.TextColor3 = Color3.fromRGB(56, 189, 248)
+        setStatus("info", "Contacting FruitsHub gateway...")
         submitBtn.Text = "Verifying Key..."
 
         task.spawn(function()
@@ -1117,8 +1153,7 @@ if isKeyNeeded then
             local ok, scriptBody = pcall(function() return game:HttpGet(verifyUrl) end)
 
             if not ok or not scriptBody or scriptBody == "" then
-                statusLbl.Text = "Network error connecting to FruitsHub gateway."
-                statusLbl.TextColor3 = Color3.fromRGB(248, 113, 113)
+                setStatus("error", "Network error connecting to FruitsHub gateway.")
                 submitBtn.Text = "Verify & Launch FruitsHub"
                 isVerifying = false
                 return
@@ -1127,23 +1162,21 @@ if isKeyNeeded then
             -- If gateway returned a key prompt, verification failed
             if scriptBody:find("%-%-%[%[FH_KEY_PROMPT%]%]") or scriptBody:find("FruitsHub_KeyPrompt") then
                 if scriptBody:find("expired") then
-                    statusLbl.Text = "This key has expired. Please get a new one."
+                    setStatus("error", "This key has expired. Please get a new one.")
                 elseif scriptBody:find("HWID Mismatch") or scriptBody:find("locked to another device") then
-                    statusLbl.Text = "HWID Mismatch: Key locked to another device."
+                    setStatus("error", "HWID Mismatch: Key locked to another device.")
                 elseif scriptBody:find("deactivated") then
-                    statusLbl.Text = "This key has been deactivated or blacklisted."
+                    setStatus("error", "This key has been deactivated or blacklisted.")
                 else
-                    statusLbl.Text = "Invalid key. Check your link and try again."
+                    setStatus("error", "Invalid key. Check your link and try again.")
                 end
-                statusLbl.TextColor3 = Color3.fromRGB(248, 113, 113)
                 submitBtn.Text = "Verify & Launch FruitsHub"
                 isVerifying = false
                 return
             end
 
             -- SUCCESS! Key is valid and payload delivered
-            statusLbl.Text = "Key Verified! Launching FruitsHub..."
-            statusLbl.TextColor3 = Color3.fromRGB(74, 222, 128)
+            setStatus("success", "Key Verified! Launching FruitsHub...")
             submitBtn.Text = "Authorized ✓"
             submitBtn.BackgroundColor3 = Color3.fromRGB(34, 197, 94)
 
