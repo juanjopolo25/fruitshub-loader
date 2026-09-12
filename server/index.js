@@ -2212,13 +2212,13 @@ app.get("/api/admin/overview", requireAdminAuth, async (req, res) => {
         const nowIso = new Date().toISOString();
         const yesterdayMs = Date.now() - 24 * 3600 * 1000;
 
-        // Total keys
-        const totalKeysRes = await db.execute("SELECT COUNT(*) as count FROM keys;");
+        // Total keys (excluding internal seed keys)
+        const totalKeysRes = await db.execute("SELECT COUNT(*) as count FROM keys WHERE provider != 'seed';");
         const totalKeys = Number(totalKeysRes.rows[0]?.count || 0);
 
-        // Active keys
+        // Active keys (excluding internal seed keys)
         const activeKeysRes = await db.execute({
-            sql: "SELECT COUNT(*) as count FROM keys WHERE active = 1 AND (expires_at > ? OR tier IN ('permanent', 'lifetime', 'admin'));",
+            sql: "SELECT COUNT(*) as count FROM keys WHERE active = 1 AND provider != 'seed' AND (expires_at > ? OR tier IN ('permanent', 'lifetime', 'admin'));",
             args: [nowIso]
         });
         const activeKeys = Number(activeKeysRes.rows[0]?.count || 0);
@@ -2282,7 +2282,7 @@ app.get("/api/admin/keys", requireAdminAuth, async (req, res) => {
         const offset = (page - 1) * limit;
 
         const nowIso = new Date().toISOString();
-        const whereClauses = [];
+        const whereClauses = ["provider != 'seed'"];
         const args = [];
 
         if (search) {
