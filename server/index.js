@@ -4256,6 +4256,184 @@ function renderSecurityRejection(message, hwid) {
 </html>`;
 }
 
+// ==================== DISCORD BOT GATEWAY (24/7 ONLINE & SLASH COMMANDS) ====================
+let discordClient = null;
+
+async function initDiscordBot() {
+    if (!CONFIG.DISCORD.BOT_TOKEN) {
+        console.log("[!] DISCORD_BOT_TOKEN not configured. Discord bot gateway disabled.");
+        return;
+    }
+
+    try {
+        const { Client, GatewayIntentBits, SlashCommandBuilder, REST, Routes, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ActivityType } = await import("discord.js");
+
+        discordClient = new Client({
+            intents: [GatewayIntentBits.Guilds]
+        });
+
+        discordClient.once("ready", async () => {
+            console.log(`[+] Discord Bot ONLINE as ${discordClient.user.tag} (ID: ${discordClient.user.id})`);
+            
+            try {
+                discordClient.user.setPresence({
+                    activities: [{ name: "Blox Fruits | /reset-hwid", type: ActivityType.Playing }],
+                    status: "online"
+                });
+            } catch (e) {}
+        });
+
+        // Slash command listener
+        discordClient.on("interactionCreate", async (interaction) => {
+            if (!interaction.isChatInputCommand()) return;
+
+            if (interaction.commandName === "reset-hwid") {
+                await interaction.deferReply({ ephemeral: true });
+                const rawKey = interaction.options.getString("key")?.trim() || "";
+
+                if (!rawKey) {
+                    return interaction.editReply({ content: "❌ Please provide a valid FruitsHub key." });
+                }
+
+                try {
+                    let keyRow = null;
+                    const keyRes = await db.execute({
+                        sql: "SELECT * FROM keys WHERE key = ?",
+                        args: [rawKey]
+                    });
+
+                    if (keyRes.rows.length > 0) {
+                        keyRow = keyRes.rows[0];
+                    } else {
+                        const verified = decodeAndVerifyKey(rawKey, CONFIG.SIGNING_SECRET);
+                        if (verified && verified.valid) {
+                            keyRow = {
+                                key: rawKey,
+                                hwid: verified.hwid,
+                                expires_at: verified.expires_at,
+                                active: 1,
+                                tier: verified.tier,
+                                last_hwid_reset: 0
+                            };
+                        }
+                    }
+
+                    if (!keyRow) {
+                        return interaction.editReply({
+                            embeds: [
+                                new EmbedBuilder()
+                                    .setTitle("❌ Key Not Found")
+                                    .setDescription("The key provided could not be found or has an invalid format.")
+                                    .setColor(0xEF4444)
+                            ]
+                        });
+                    }
+
+                    if (!keyRow.active) {
+                        return interaction.editReply({
+                            embeds: [
+                                new EmbedBuilder()
+                                    .setTitle("❌ Key Deactivated")
+                                    .setDescription("This key has been deactivated or blacklisted.")
+                                    .setColor(0xEF4444)
+                            ]
+                        });
+                    }
+
+                    const expMs = keyRow.expires_at ? new Date(keyRow.expires_at).getTime() : 0;
+                    if (expMs > 0 && expMs < Date.now()) {
+                        return interaction.editReply({
+                            embeds: [
+                                new EmbedBuilder()
+                                    .setTitle("❌ Key Expired")
+                                    .setDescription("This key has expired. Please complete the checkpoints to get a new 24h key.")
+                                    .setColor(0xEF4444)
+                            ]
+                        });
+                    }
+
+                    const cooldownMs = (CONFIG.HWID_RESET_COOLDOWN_HOURS || 3) * 3600 * 1000;
+                    const lastReset = Number(keyRow.last_hwid_reset || 0);
+                    const timeSince = Date.now() - lastReset;
+
+                    if (lastReset > 0 && timeSince < cooldownMs) {
+                        const remMin = Math.ceil((cooldownMs - timeSince) / 60000);
+                        return interaction.editReply({
+                            embeds: [
+                                new EmbedBuilder()
+                                    .setTitle("⏳ Reset On Cooldown")
+                                    .setDescription(`Free keys can reset their HWID lock once every 3 hours.\n\nYou can reset this key again in **${remMin} minute(s)**.`)
+                                    .setColor(0xF59E0B)
+                            ]
+                        });
+                    }
+
+                    const resetToken = crypto.randomBytes(16).toString("hex");
+                    await db.execute({
+                        sql: "INSERT OR REPLACE INTO system_config (key, value) VALUES (?, ?)",
+                        args: [`HWID_TOKEN_${resetToken}`, JSON.stringify({ key: rawKey, created_at: Date.now() })]
+                    });
+
+                    const returnUrl = `https://fruitshub.onrender.com/api/hwid/verify-reset?token=${resetToken}`;
+                    let checkpointUrl = CONFIG.HWID_RESET_LOOTLABS_LINK || "https://lootdest.org/s?EdniakIO";
+
+                    if (CONFIG.LOOTLABS_API_TOKEN) {
+                        try {
+                            const encRes = await fetch("https://creators.lootlabs.gg/api/public/url_encryptor", {
+                                method: "POST",
+                                headers: {
+                                    "Authorization": `Bearer ${CONFIG.LOOTLABS_API_TOKEN}`,
+                                    "Content-Type": "application/json"
+                                },
+                                body: JSON.stringify({ destination_url: returnUrl })
+                            });
+                            const encJson = await encRes.json();
+                            if (encJson && encJson.message) {
+                                checkpointUrl = `${checkpointUrl}&data=${encJson.message}&puid=${encodeURIComponent(resetToken)}`;
+                            } else {
+                                checkpointUrl = `${checkpointUrl}&puid=${encodeURIComponent(resetToken)}`;
+                            }
+                        } catch (e) {
+                            checkpointUrl = `${checkpointUrl}&puid=${encodeURIComponent(resetToken)}`;
+                        }
+                    } else {
+                        checkpointUrl = `${checkpointUrl}&puid=${encodeURIComponent(resetToken)}`;
+                    }
+
+                    const embed = new EmbedBuilder()
+                        .setTitle("🔄 FruitsHub HWID Unlock")
+                        .setDescription(
+                            `**Key**: \`${rawKey}\`\n\n` +
+                            `To unlock your device lock and use this key on your new device or executor, click the button below and complete 1 quick checkpoint.\n\n` +
+                            `Once completed, your key will be **unlocked immediately** and ready to execute in Blox Fruits!`
+                        )
+                        .setColor(0x38BDF8)
+                        .setFooter({ text: "FruitsHub Automated Gateway • 24/7 Instant" })
+                        .setTimestamp();
+
+                    const row = new ActionRowBuilder().addComponents(
+                        new ButtonBuilder()
+                            .setLabel("Unlock HWID via Checkpoint (1 Quick Step) ↗")
+                            .setStyle(ButtonStyle.Link)
+                            .setURL(checkpointUrl)
+                    );
+
+                    return interaction.editReply({ embeds: [embed], components: [row] });
+                } catch (cmdErr) {
+                    console.error("[-] Error executing /reset-hwid command:", cmdErr);
+                    return interaction.editReply({
+                        content: "❌ An internal error occurred while processing your reset request."
+                    });
+                }
+            }
+        });
+
+        await discordClient.login(CONFIG.DISCORD.BOT_TOKEN);
+    } catch (botErr) {
+        console.error("[-] Discord Bot gateway failed to start:", botErr.message);
+    }
+}
+
 // ==================== START SERVER ====================
 async function start() {
     await initDatabase();
@@ -4268,6 +4446,9 @@ async function start() {
     setInterval(() => {
         pruneExpiredKeys(7).catch(e => console.error("[-] Recurring prune failed:", e));
     }, 24 * 3600 * 1000);
+
+    // Start 24/7 Discord Bot Gateway
+    initDiscordBot().catch(e => console.error("[-] Discord bot startup error:", e));
 
     app.listen(CONFIG.PORT, () => {
         console.log(`
