@@ -2212,13 +2212,13 @@ app.get("/api/admin/overview", requireAdminAuth, async (req, res) => {
         const nowIso = new Date().toISOString();
         const yesterdayMs = Date.now() - 24 * 3600 * 1000;
 
-        // Total keys (excluding internal seed keys)
-        const totalKeysRes = await db.execute("SELECT COUNT(*) as count FROM keys WHERE provider != 'seed';");
+        // Total keys (excluding internal 24h seed test keys)
+        const totalKeysRes = await db.execute("SELECT COUNT(*) as count FROM keys WHERE NOT (provider = 'seed' AND tier = '24h');");
         const totalKeys = Number(totalKeysRes.rows[0]?.count || 0);
 
-        // Active keys (excluding internal seed keys)
+        // Active keys (excluding internal 24h seed test keys)
         const activeKeysRes = await db.execute({
-            sql: "SELECT COUNT(*) as count FROM keys WHERE active = 1 AND provider != 'seed' AND (expires_at > ? OR tier IN ('permanent', 'lifetime', 'admin'));",
+            sql: "SELECT COUNT(*) as count FROM keys WHERE active = 1 AND NOT (provider = 'seed' AND tier = '24h') AND (expires_at > ? OR tier IN ('permanent', 'lifetime', 'admin'));",
             args: [nowIso]
         });
         const activeKeys = Number(activeKeysRes.rows[0]?.count || 0);
@@ -2282,7 +2282,7 @@ app.get("/api/admin/keys", requireAdminAuth, async (req, res) => {
         const offset = (page - 1) * limit;
 
         const nowIso = new Date().toISOString();
-        const whereClauses = ["provider != 'seed'"];
+        const whereClauses = ["NOT (provider = 'seed' AND tier = '24h')"];
         const args = [];
 
         if (search) {
@@ -2364,10 +2364,50 @@ app.get("/api/admin/keys", requireAdminAuth, async (req, res) => {
 // 8.5 Key Management: Create Key (Single or Bulk)
 app.post("/api/admin/keys/create", requireAdminAuth, async (req, res) => {
     try {
-        const { durationHours, tier = "24h", note = "", count = 1 } = req.body;
+        const { durationHours, tier = "24h", note = "", count = 1, discordId = "" } = req.body;
         const totalToCreate = Math.min(20, Math.max(1, parseInt(count || "1", 10)));
         const hours = parseFloat(durationHours);
         const isPermanent = hours === -1 || tier === "permanent" || tier === "lifetime";
+
+        // Resolve Discord User ID if provided
+        let resolvedDiscordId = null;
+        let resolvedDiscordTag = null;
+        const cleanDiscordId = String(discordId || "").trim();
+
+        if (cleanDiscordId) {
+            try {
+                if (discordClient && discordClient.isReady()) {
+                    const fetchedUser = await discordClient.users.fetch(cleanDiscordId).catch(() => null);
+                    if (fetchedUser) {
+                        resolvedDiscordId = fetchedUser.id;
+                        resolvedDiscordTag = fetchedUser.discriminator && fetchedUser.discriminator !== "0"
+                            ? `${fetchedUser.username}#${fetchedUser.discriminator}`
+                            : (fetchedUser.global_name || fetchedUser.username);
+                    }
+                }
+
+                if (!resolvedDiscordId && CONFIG.DISCORD.BOT_TOKEN) {
+                    const restRes = await fetch(`https://discord.com/api/v10/users/${cleanDiscordId}`, {
+                        headers: { "Authorization": `Bot ${CONFIG.DISCORD.BOT_TOKEN}` }
+                    });
+                    if (restRes.ok) {
+                        const uData = await restRes.json();
+                        resolvedDiscordId = uData.id;
+                        resolvedDiscordTag = uData.discriminator && uData.discriminator !== "0"
+                            ? `${uData.username}#${uData.discriminator}`
+                            : (uData.global_name || uData.username);
+                    }
+                }
+
+                if (!resolvedDiscordId) {
+                    resolvedDiscordId = cleanDiscordId;
+                    resolvedDiscordTag = `User (${cleanDiscordId})`;
+                }
+            } catch (err) {
+                console.error("[-] Failed resolving Discord user:", err);
+                resolvedDiscordId = cleanDiscordId;
+            }
+        }
 
         const now = Date.now();
         const nowIso = new Date(now).toISOString();
@@ -2380,8 +2420,8 @@ app.post("/api/admin/keys/create", requireAdminAuth, async (req, res) => {
         for (let i = 0; i < totalToCreate; i++) {
             const keyStr = generateSignedKey("UNSET", expiresMs, finalTier);
             await db.execute({
-                sql: "INSERT OR REPLACE INTO keys (key, hwid, created_at, expires_at, active, tier, provider, executions_count, note) VALUES (?, 'UNSET', ?, ?, 1, ?, 'admin', 0, ?)",
-                args: [keyStr, nowIso, expiresIso, finalTier, String(note || "").trim()]
+                sql: "INSERT OR REPLACE INTO keys (key, hwid, created_at, expires_at, active, tier, provider, executions_count, note, discord_id, discord_tag) VALUES (?, 'UNSET', ?, ?, 1, ?, 'admin', 0, ?, ?, ?)",
+                args: [keyStr, nowIso, expiresIso, finalTier, String(note || "").trim(), resolvedDiscordId, resolvedDiscordTag]
             });
             createdKeys.push({
                 key: keyStr,
@@ -2389,7 +2429,9 @@ app.post("/api/admin/keys/create", requireAdminAuth, async (req, res) => {
                 tier: finalTier,
                 expires_at: expiresIso,
                 created_at: nowIso,
-                note: note || ""
+                note: note || "",
+                discord_id: resolvedDiscordId,
+                discord_tag: resolvedDiscordTag
             });
         }
 

@@ -558,12 +558,14 @@ const AdminApp = (() => {
   }
 
   // Modals & Key Creation
-  function openCreateModal(duration = 24, tier = "24h", note = "") {
+  function openCreateModal(duration = 24, tier = "24h", note = "", discordId = "") {
     const modal = document.getElementById("modal-create-key");
     if (!modal) return;
 
     document.getElementById("modal-create-duration").value = duration;
     document.getElementById("modal-create-tier").value = tier;
+    const discordInput = document.getElementById("modal-create-discord");
+    if (discordInput) discordInput.value = discordId;
     document.getElementById("modal-create-note").value = note;
     document.getElementById("modal-create-count").value = 1;
 
@@ -588,6 +590,7 @@ const AdminApp = (() => {
     e.preventDefault();
     const duration = document.getElementById("modal-create-duration").value;
     const tier = document.getElementById("modal-create-tier").value;
+    const discordId = document.getElementById("modal-create-discord")?.value.trim() || "";
     const note = document.getElementById("modal-create-note").value.trim();
     const count = parseInt(document.getElementById("modal-create-count").value || "1", 10);
     const btn = document.getElementById("btn-submit-create");
@@ -600,6 +603,7 @@ const AdminApp = (() => {
         body: JSON.stringify({
           durationHours: duration === "-1" ? -1 : parseFloat(duration),
           tier,
+          discordId,
           note,
           count
         })
