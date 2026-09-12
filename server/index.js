@@ -505,6 +505,15 @@ pcall(function()
 end)
 
 local hasFs = (writefile and readfile and isfile) ~= nil
+if Key == "" and hasFs and isfile("FruitsHub/saved_key.txt") then
+    pcall(function()
+        local saved = readfile("FruitsHub/saved_key.txt")
+        if saved and saved ~= "" then
+            Key = tostring(saved):gsub("%s+", "")
+        end
+    end)
+end
+
 local localCached = hasFs and isfile(CachePath)
 local cachedVersion = (hasFs and isfile(VerPath)) and readfile(VerPath) or "none"
 
@@ -537,7 +546,7 @@ if scriptContent:find("%-%-%[%[FH_CACHE_VALID%]%]") and localCached then
     end
 end
 
-if scriptContent:find("FruitsHub:") and scriptContent:find("p:Kick") then
+if scriptContent:find("%-%-%[%[FH_KEY_PROMPT%]%]") or (scriptContent:find("FruitsHub") and (scriptContent:find("KeyPrompt") or scriptContent:find("p:Kick"))) then
     return loadstring(scriptContent)()
 end
 
@@ -559,23 +568,520 @@ loadstring(scriptContent)()
     return res.status(200).send(loaderLua);
 });
 
-// Helper for generating Luau kick code
-function generateKickResponse(message, copyUrl) {
-    const safeMsg = JSON.stringify(message);
-    const safeUrl = copyUrl ? JSON.stringify(copyUrl) : '""';
-    return `
-        local msg = ${safeMsg}
-        local url = ${safeUrl}
-        if url ~= "" and setclipboard then
-            pcall(function() setclipboard(url) end)
+// Helper for generating Luau in-game Key Prompt GUI (Zero Kick, 100% Native UX)
+function generateKickResponse(message, copyUrl, baseUrl = "", hwid = "", executor = "") {
+    const safeMsg = JSON.stringify(String(message || "FruitsHub Key Required"));
+    const safeUrl = JSON.stringify(String(copyUrl || ""));
+    const resolvedBaseUrl = baseUrl || (copyUrl ? copyUrl.split("?")[0].replace(/\/$/, "") : "");
+    const safeBaseUrl = JSON.stringify(String(resolvedBaseUrl));
+    const safeHwid = JSON.stringify(String(hwid || "UNKNOWN_HWID"));
+    const safeExecutor = JSON.stringify(String(executor || "Unknown"));
+
+    return `--[[FH_KEY_PROMPT]]
+-- FruitsHub Native Key System Modal (No Kick, Zero Slop)
+repeat task.wait() until game:IsLoaded() and game.Players.LocalPlayer
+
+local CoreGui = game:GetService("CoreGui")
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local StarterGui = game:GetService("StarterGui")
+local HttpService = game:GetService("HttpService")
+local UserInputService = game:GetService("UserInputService")
+local LP = Players.LocalPlayer
+
+local msgText = ${safeMsg}
+local keyUrl = ${safeUrl}
+local baseUrl = ${safeBaseUrl}
+local currentHwid = ${safeHwid}
+local currentEx = ${safeExecutor}
+
+-- Auto copy URL to clipboard on load if provided
+if keyUrl ~= "" and setclipboard then
+    pcall(function() setclipboard(keyUrl) end)
+    pcall(function()
+        StarterGui:SetCore("SendNotification", {
+            Title = "FruitsHub",
+            Text = "Key link copied to clipboard!",
+            Duration = 3
+        })
+    end)
+end
+
+-- Resolve GUI Parent (Prefer CoreGui, fallback to PlayerGui)
+local parentGui = nil
+pcall(function() parentGui = CoreGui end)
+if not parentGui or not pcall(function() return parentGui.Name end) then
+    pcall(function() parentGui = LP:WaitForChild("PlayerGui", 5) end)
+end
+if not parentGui then
+    pcall(function() parentGui = LP.PlayerGui end)
+end
+
+if not parentGui then return warn("[FruitsHub] Failed to locate PlayerGui / CoreGui") end
+
+-- Clean old instances
+for _, child in ipairs(parentGui:GetChildren()) do
+    if child.Name == "FruitsHub_KeyPrompt" then
+        pcall(function() child:Destroy() end)
+    end
+end
+
+local gui = Instance.new("ScreenGui")
+gui.Name = "FruitsHub_KeyPrompt"
+gui.ResetOnSpawn = false
+gui.DisplayOrder = 10000
+gui.IgnoreGuiInset = true
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+local function enforceEnglishUi(inst)
+    if inst:IsA("TextLabel") or inst:IsA("TextButton") or inst:IsA("TextBox") then
+        inst.AutoLocalize = false
+    end
+end
+gui.DescendantAdded:Connect(enforceEnglishUi)
+
+-- Backdrop overlay
+local backdrop = Instance.new("Frame")
+backdrop.Name = "Backdrop"
+backdrop.Size = UDim2.new(1, 0, 1, 0)
+backdrop.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+backdrop.BackgroundTransparency = 0.55
+backdrop.BorderSizePixel = 0
+backdrop.Parent = gui
+
+-- Main Modal Card
+local isKeyNeeded = (keyUrl ~= "")
+local cardHeight = isKeyNeeded and 242 or 150
+local card = Instance.new("Frame")
+card.Name = "Card"
+card.AnchorPoint = Vector2.new(0.5, 0.5)
+card.Position = UDim2.new(0.5, 0, 0.5, 0)
+card.Size = UDim2.new(0, 390, 0, cardHeight)
+card.BackgroundColor3 = Color3.fromRGB(15, 18, 26)
+card.BorderSizePixel = 0
+card.ClipsDescendants = true
+card.Parent = gui
+
+local cardCorner = Instance.new("UICorner")
+cardCorner.CornerRadius = UDim.new(0, 9)
+cardCorner.Parent = card
+
+local cardStroke = Instance.new("UIStroke")
+cardStroke.Color = Color3.fromRGB(38, 45, 60)
+cardStroke.Thickness = 1.2
+cardStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+cardStroke.Parent = card
+
+-- Header Container
+local header = Instance.new("Frame")
+header.Name = "Header"
+header.Size = UDim2.new(1, 0, 0, 42)
+header.BackgroundColor3 = Color3.fromRGB(18, 22, 32)
+header.BorderSizePixel = 0
+header.Parent = card
+
+local headerDivider = Instance.new("Frame")
+headerDivider.Name = "Divider"
+headerDivider.Size = UDim2.new(1, 0, 0, 1)
+headerDivider.Position = UDim2.new(0, 0, 1, -1)
+headerDivider.BackgroundColor3 = Color3.fromRGB(38, 45, 60)
+headerDivider.BorderSizePixel = 0
+headerDivider.Parent = header
+
+-- Dragging support for header
+local dragging, dragInput, dragStart, startPos = false, nil, nil, nil
+header.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = card.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+header.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging and startPos and dragStart then
+        local delta = input.Position - dragStart
+        card.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+-- FruitsHub Logo
+local logo = Instance.new("ImageLabel")
+logo.Name = "Logo"
+logo.Size = UDim2.fromOffset(22, 22)
+logo.Position = UDim2.new(0, 12, 0.5, -11)
+logo.BackgroundTransparency = 1
+logo.ScaleType = Enum.ScaleType.Fit
+logo.Image = "rbxthumb://type=Asset&id=94904197752233&w=150&h=150"
+logo.Parent = header
+
+task.spawn(function()
+    local hasFs = (writefile and readfile and isfile) ~= nil
+    local hasGet = typeof(getcustomasset) == "function"
+    local localPath = "FruitsHub/logo.png"
+    if hasFs and hasGet and isfile(localPath) then
+        local ok, uri = pcall(getcustomasset, localPath)
+        if ok and uri and uri ~= "" then logo.Image = uri return end
+    end
+    local req = (syn and syn.request) or (http and http.request) or http_request or request
+    if req and hasFs and writefile then
+        pcall(function()
+            local res = req({ Url = "https://files.catbox.moe/kgq50j.png", Method = "GET" })
+            if res and (res.StatusCode == 200 or res.status == 200) then
+                local body = res.Body or res.body
+                if body and #body > 100 then
+                    if makefolder and not isfolder("FruitsHub") then makefolder("FruitsHub") end
+                    writefile(localPath, body)
+                    if hasGet then
+                        local ok, uri = pcall(getcustomasset, localPath)
+                        if ok and uri then logo.Image = uri end
+                    end
+                end
+            end
+        end)
+    end
+end)
+
+-- Brand Text
+local brand = Instance.new("TextLabel")
+brand.Name = "Brand"
+brand.Text = "FRUITSHUB"
+brand.Font = Enum.Font.GothamBold
+brand.TextSize = 13
+brand.TextColor3 = Color3.fromRGB(56, 189, 248)
+brand.TextXAlignment = Enum.TextXAlignment.Left
+brand.BackgroundTransparency = 1
+brand.Position = UDim2.new(0, 40, 0, 0)
+brand.Size = UDim2.new(0, 85, 1, 0)
+brand.Parent = header
+
+-- Badge Tag
+local badge = Instance.new("Frame")
+badge.Name = "Badge"
+badge.Size = UDim2.new(0, 84, 0, 18)
+badge.Position = UDim2.new(0, 130, 0.5, -9)
+badge.BackgroundColor3 = Color3.fromRGB(24, 32, 47)
+badge.BorderSizePixel = 0
+badge.Parent = header
+
+local badgeCorner = Instance.new("UICorner")
+badgeCorner.CornerRadius = UDim.new(0, 4)
+badgeCorner.Parent = badge
+
+local badgeText = Instance.new("TextLabel")
+badgeText.Size = UDim2.new(1, 0, 1, 0)
+badgeText.BackgroundTransparency = 1
+badgeText.Text = (isKeyNeeded and "KEY REQUIRED" or "SYSTEM NOTICE")
+badgeText.Font = Enum.Font.GothamBold
+badgeText.TextSize = 9
+badgeText.TextColor3 = Color3.fromRGB(148, 163, 184)
+badgeText.Parent = badge
+
+-- Close Button ("✕")
+local closeBtn = Instance.new("TextButton")
+closeBtn.Name = "CloseBtn"
+closeBtn.Size = UDim2.fromOffset(24, 24)
+closeBtn.Position = UDim2.new(1, -34, 0.5, -12)
+closeBtn.BackgroundColor3 = Color3.fromRGB(24, 30, 42)
+closeBtn.BorderSizePixel = 0
+closeBtn.Text = "✕"
+closeBtn.Font = Enum.Font.GothamBold
+closeBtn.TextSize = 11
+closeBtn.TextColor3 = Color3.fromRGB(148, 163, 184)
+closeBtn.AutoButtonColor = false
+closeBtn.Parent = header
+
+local closeCorner = Instance.new("UICorner")
+closeCorner.CornerRadius = UDim.new(0, 5)
+closeCorner.Parent = closeBtn
+
+closeBtn.MouseEnter:Connect(function()
+    closeBtn.BackgroundColor3 = Color3.fromRGB(239, 68, 68)
+    closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+end)
+closeBtn.MouseLeave:Connect(function()
+    closeBtn.BackgroundColor3 = Color3.fromRGB(24, 30, 42)
+    closeBtn.TextColor3 = Color3.fromRGB(148, 163, 184)
+end)
+closeBtn.MouseButton1Click:Connect(function()
+    gui:Destroy()
+end)
+
+-- Content Frame
+local content = Instance.new("Frame")
+content.Name = "Content"
+content.Position = UDim2.new(0, 16, 0, 48)
+content.Size = UDim2.new(1, -32, 1, -56)
+content.BackgroundTransparency = 1
+content.Parent = card
+
+-- Description Message
+local msgLabel = Instance.new("TextLabel")
+msgLabel.Name = "MsgLabel"
+msgLabel.Size = UDim2.new(1, 0, 0, 30)
+msgLabel.Position = UDim2.new(0, 0, 0, 4)
+msgLabel.BackgroundTransparency = 1
+msgLabel.Text = msgText
+msgLabel.Font = Enum.Font.GothamMedium
+msgLabel.TextSize = 11
+msgLabel.TextColor3 = Color3.fromRGB(203, 213, 225)
+msgLabel.TextXAlignment = Enum.TextXAlignment.Left
+msgLabel.TextYAlignment = Enum.TextYAlignment.Top
+msgLabel.TextWrapped = true
+msgLabel.Parent = content
+
+if isKeyNeeded then
+    -- "Get Key" Button
+    local getKeyBtn = Instance.new("TextButton")
+    getKeyBtn.Name = "GetKeyBtn"
+    getKeyBtn.Size = UDim2.new(1, 0, 0, 32)
+    getKeyBtn.Position = UDim2.new(0, 0, 0, 38)
+    getKeyBtn.BackgroundColor3 = Color3.fromRGB(24, 30, 42)
+    getKeyBtn.BorderSizePixel = 0
+    getKeyBtn.Text = "Get Key (Copy Gateway Link)  ↗"
+    getKeyBtn.Font = Enum.Font.GothamMedium
+    getKeyBtn.TextSize = 11
+    getKeyBtn.TextColor3 = Color3.fromRGB(226, 232, 240)
+    getKeyBtn.AutoButtonColor = false
+    getKeyBtn.Parent = content
+
+    local getKeyCorner = Instance.new("UICorner")
+    getKeyCorner.CornerRadius = UDim.new(0, 6)
+    getKeyCorner.Parent = getKeyBtn
+
+    local getKeyStroke = Instance.new("UIStroke")
+    getKeyStroke.Color = Color3.fromRGB(45, 55, 72)
+    getKeyStroke.Thickness = 1
+    getKeyStroke.Parent = getKeyBtn
+
+    local isCopied = false
+    getKeyBtn.MouseButton1Click:Connect(function()
+        if setclipboard then
+            pcall(function() setclipboard(keyUrl) end)
         end
-        local p = game:GetService("Players").LocalPlayer
-        if p then
-            p:Kick(msg .. (url ~= "" and "\\n\\nGet Key: " .. url or ""))
-        else
-            warn(msg .. (url ~= "" and " [URL: " .. url .. "]" or ""))
+        pcall(function()
+            StarterGui:SetCore("SendNotification", {
+                Title = "FruitsHub",
+                Text = "Key link copied to clipboard!",
+                Duration = 3
+            })
+        end)
+        if not isCopied then
+            isCopied = true
+            getKeyBtn.Text = "Link Copied to Clipboard! ✓"
+            getKeyBtn.TextColor3 = Color3.fromRGB(74, 222, 128)
+            getKeyStroke.Color = Color3.fromRGB(34, 197, 94)
+            task.delay(2.5, function()
+                if getKeyBtn and getKeyBtn.Parent then
+                    getKeyBtn.Text = "Get Key (Copy Gateway Link)  ↗"
+                    getKeyBtn.TextColor3 = Color3.fromRGB(226, 232, 240)
+                    getKeyStroke.Color = Color3.fromRGB(45, 55, 72)
+                    isCopied = false
+                end
+            end)
         end
-    `;
+    end)
+
+    -- Key Input Box
+    local keyBox = Instance.new("TextBox")
+    keyBox.Name = "KeyBox"
+    keyBox.Size = UDim2.new(1, 0, 0, 34)
+    keyBox.Position = UDim2.new(0, 0, 0, 78)
+    keyBox.BackgroundColor3 = Color3.fromRGB(10, 12, 18)
+    keyBox.BorderSizePixel = 0
+    keyBox.PlaceholderText = "Paste your key here (FH-...)"
+    keyBox.PlaceholderColor3 = Color3.fromRGB(100, 116, 139)
+    keyBox.Text = ""
+    keyBox.TextColor3 = Color3.fromRGB(241, 245, 249)
+    keyBox.Font = Enum.Font.GothamMedium
+    keyBox.TextSize = 11
+    keyBox.ClearTextOnFocus = false
+    keyBox.Parent = content
+
+    local keyBoxPadding = Instance.new("UIPadding")
+    keyBoxPadding.PaddingLeft = UDim.new(0, 10)
+    keyBoxPadding.PaddingRight = UDim.new(0, 10)
+    keyBoxPadding.Parent = keyBox
+
+    local keyBoxCorner = Instance.new("UICorner")
+    keyBoxCorner.CornerRadius = UDim.new(0, 6)
+    keyBoxCorner.Parent = keyBox
+
+    local keyBoxStroke = Instance.new("UIStroke")
+    keyBoxStroke.Color = Color3.fromRGB(38, 45, 60)
+    keyBoxStroke.Thickness = 1
+    keyBoxStroke.Parent = keyBox
+
+    -- Pre-fill if saved locally
+    pcall(function()
+        if isfile and isfile("FruitsHub/saved_key.txt") then
+            local sk = readfile("FruitsHub/saved_key.txt")
+            if sk and sk ~= "" then keyBox.Text = tostring(sk):gsub("%s+", "") end
+        end
+    end)
+
+    -- Status Feedback Label
+    local statusLbl = Instance.new("TextLabel")
+    statusLbl.Name = "StatusLbl"
+    statusLbl.Size = UDim2.new(1, 0, 0, 16)
+    statusLbl.Position = UDim2.new(0, 0, 0, 116)
+    statusLbl.BackgroundTransparency = 1
+    statusLbl.Text = ""
+    statusLbl.Font = Enum.Font.Gotham
+    statusLbl.TextSize = 10
+    statusLbl.TextColor3 = Color3.fromRGB(248, 113, 113)
+    statusLbl.TextXAlignment = Enum.TextXAlignment.Left
+    statusLbl.Parent = content
+
+    -- Auto-detect key from clipboard if starts with FH-
+    pcall(function()
+        if getclipboard then
+            local clip = tostring(getclipboard()):gsub("%s+", "")
+            if clip:sub(1, 3) == "FH-" and keyBox.Text == "" then
+                keyBox.Text = clip
+                statusLbl.Text = "Key detected from clipboard! Click Verify to launch."
+                statusLbl.TextColor3 = Color3.fromRGB(56, 189, 248)
+            end
+        end
+    end)
+
+    -- Verify & Launch Button
+    local submitBtn = Instance.new("TextButton")
+    submitBtn.Name = "SubmitBtn"
+    submitBtn.Size = UDim2.new(1, 0, 0, 36)
+    submitBtn.Position = UDim2.new(0, 0, 0, 136)
+    submitBtn.BackgroundColor3 = Color3.fromRGB(56, 189, 248)
+    submitBtn.BorderSizePixel = 0
+    submitBtn.Text = "Verify & Launch FruitsHub"
+    submitBtn.Font = Enum.Font.GothamBold
+    submitBtn.TextSize = 12
+    submitBtn.TextColor3 = Color3.fromRGB(11, 14, 20)
+    submitBtn.AutoButtonColor = false
+    submitBtn.Parent = content
+
+    local submitCorner = Instance.new("UICorner")
+    submitCorner.CornerRadius = UDim.new(0, 6)
+    submitCorner.Parent = submitBtn
+
+    submitBtn.MouseEnter:Connect(function()
+        TweenService:Create(submitBtn, TweenInfo.new(0.15), { BackgroundColor3 = Color3.fromRGB(125, 211, 252) }):Play()
+    end)
+    submitBtn.MouseLeave:Connect(function()
+        TweenService:Create(submitBtn, TweenInfo.new(0.15), { BackgroundColor3 = Color3.fromRGB(56, 189, 248) }):Play()
+    end)
+
+    local isVerifying = false
+    submitBtn.MouseButton1Click:Connect(function()
+        if isVerifying then return end
+        local rawKey = tostring(keyBox.Text):gsub("%s+", "")
+        if rawKey == "" or rawKey == "PASTE_KEY_HERE" then
+            statusLbl.Text = "Please paste your key first"
+            statusLbl.TextColor3 = Color3.fromRGB(248, 113, 113)
+            return
+        end
+
+        isVerifying = true
+        statusLbl.Text = "Contacting gateway..."
+        statusLbl.TextColor3 = Color3.fromRGB(56, 189, 248)
+        submitBtn.Text = "Verifying Key..."
+
+        task.spawn(function()
+            local encEx = currentEx
+            pcall(function()
+                if HttpService and HttpService.UrlEncode then encEx = HttpService:UrlEncode(currentEx) end
+            end)
+            local verifyUrl = baseUrl .. "/load?key=" .. rawKey .. "&hwid=" .. currentHwid .. "&cv=none&ex=" .. encEx
+            local ok, scriptBody = pcall(function() return game:HttpGet(verifyUrl) end)
+
+            if not ok or not scriptBody or scriptBody == "" then
+                statusLbl.Text = "Network error connecting to FruitsHub gateway."
+                statusLbl.TextColor3 = Color3.fromRGB(248, 113, 113)
+                submitBtn.Text = "Verify & Launch FruitsHub"
+                isVerifying = false
+                return
+            end
+
+            -- If gateway returned a key prompt, verification failed
+            if scriptBody:find("%-%-%[%[FH_KEY_PROMPT%]%]") or scriptBody:find("FruitsHub_KeyPrompt") then
+                if scriptBody:find("expired") then
+                    statusLbl.Text = "This key has expired. Please get a new one."
+                elseif scriptBody:find("HWID Mismatch") or scriptBody:find("locked to another device") then
+                    statusLbl.Text = "HWID Mismatch: Key locked to another device."
+                elseif scriptBody:find("deactivated") then
+                    statusLbl.Text = "This key has been deactivated or blacklisted."
+                else
+                    statusLbl.Text = "Invalid key. Check your link and try again."
+                end
+                statusLbl.TextColor3 = Color3.fromRGB(248, 113, 113)
+                submitBtn.Text = "Verify & Launch FruitsHub"
+                isVerifying = false
+                return
+            end
+
+            -- SUCCESS! Key is valid and payload delivered
+            statusLbl.Text = "Key Verified! Launching FruitsHub..."
+            statusLbl.TextColor3 = Color3.fromRGB(74, 222, 128)
+            submitBtn.Text = "Authorized ✓"
+            submitBtn.BackgroundColor3 = Color3.fromRGB(34, 197, 94)
+
+            -- Persist key in global environment and disk
+            getgenv().Key = rawKey
+            getgenv().FruitsHubKey = rawKey
+            pcall(function()
+                if writefile then
+                    if makefolder and not isfolder("FruitsHub") then makefolder("FruitsHub") end
+                    writefile("FruitsHub/saved_key.txt", rawKey)
+                    writefile("FruitsHub/cache_v2.luau", scriptBody)
+                    writefile("FruitsHub/version_v2.txt", "v1.1.8")
+                end
+            end)
+
+            task.wait(0.3)
+            gui:Destroy()
+
+            -- Run the delivered payload
+            local fn, err = loadstring(scriptBody)
+            if fn then
+                fn()
+            else
+                warn("[FruitsHub] Error launching script:", err)
+            end
+        end)
+    end)
+else
+    -- Simple notice mode (e.g. maintenance, error)
+    local okBtn = Instance.new("TextButton")
+    okBtn.Name = "OkBtn"
+    okBtn.Size = UDim2.new(1, 0, 0, 36)
+    okBtn.Position = UDim2.new(0, 0, 0, 48)
+    okBtn.BackgroundColor3 = Color3.fromRGB(30, 41, 59)
+    okBtn.BorderSizePixel = 0
+    okBtn.Text = "Dismiss"
+    okBtn.Font = Enum.Font.GothamMedium
+    okBtn.TextSize = 12
+    okBtn.TextColor3 = Color3.fromRGB(241, 245, 249)
+    okBtn.Parent = content
+
+    local okCorner = Instance.new("UICorner")
+    okCorner.CornerRadius = UDim.new(0, 6)
+    okCorner.Parent = okBtn
+
+    okBtn.MouseButton1Click:Connect(function()
+        gui:Destroy()
+    end)
+end
+
+gui.Parent = parentGui
+`;
 }
 
 // Helper to record execution events for telemetry & analytics
@@ -614,12 +1120,12 @@ app.get(["/load", "/load.luau"], async (req, res) => {
 
     if (!key || key === "PASTE_KEY_HERE" || key === "nil" || key === "YOUR_KEY_HERE" || key === "") {
         recordExecutionLog("NONE", hwid, executor, "missing_key", clientIp);
-        return res.status(200).send(generateKickResponse("FruitsHub: No access key provided. Key link has been copied to your clipboard.", keyUrl));
+        return res.status(200).send(generateKickResponse("FruitsHub: No access key provided. Complete the checkpoint to get your key.", keyUrl, baseUrl, hwid, executor));
     }
 
     if (SCRIPT_CACHE.maintenance) {
         recordExecutionLog(key, hwid, executor, "maintenance", clientIp);
-        return res.status(200).send(generateKickResponse("FruitsHub: Script is currently down for scheduled maintenance."));
+        return res.status(200).send(generateKickResponse("FruitsHub: Script is currently down for scheduled maintenance.", null, baseUrl, hwid, executor));
     }
 
     // Query key in Database
@@ -655,18 +1161,18 @@ app.get(["/load", "/load.luau"], async (req, res) => {
 
         if (!keyRow) {
             recordExecutionLog(key, hwid, executor, "invalid_key", clientIp);
-            return res.status(200).send(generateKickResponse("FruitsHub: Invalid key. Key link has been copied to your clipboard to generate a new one.", keyUrl));
+            return res.status(200).send(generateKickResponse("FruitsHub: Invalid key. Key link has been copied to your clipboard to generate a new one.", keyUrl, baseUrl, hwid, executor));
         }
 
         if (!keyRow.active) {
             recordExecutionLog(key, hwid, executor, "deactivated", clientIp);
-            return res.status(200).send(generateKickResponse("FruitsHub: This key has been deactivated or blacklisted."));
+            return res.status(200).send(generateKickResponse("FruitsHub: This key has been deactivated or blacklisted.", null, baseUrl, hwid, executor));
         }
 
         const expiresDate = keyRow.expires_at ? new Date(String(keyRow.expires_at)) : null;
         if (expiresDate && expiresDate < new Date()) {
             recordExecutionLog(key, hwid, executor, "expired", clientIp);
-            return res.status(200).send(generateKickResponse("FruitsHub: Access key expired. Key link has been copied to your clipboard to renew.", keyUrl));
+            return res.status(200).send(generateKickResponse("FruitsHub: Access key expired. Key link has been copied to your clipboard to renew.", keyUrl, baseUrl, hwid, executor));
         }
 
         // HWID Lock
@@ -678,7 +1184,7 @@ app.get(["/load", "/load.luau"], async (req, res) => {
             });
         } else if (keyRow.hwid !== hwid) {
             recordExecutionLog(key, hwid, executor, "hwid_mismatch", clientIp);
-            return res.status(200).send(generateKickResponse("FruitsHub: Key is locked to another device (HWID Mismatch). Each key is single-device.", keyUrl));
+            return res.status(200).send(generateKickResponse("FruitsHub: Key is locked to another device (HWID Mismatch). Each key is single-device.", keyUrl, baseUrl, hwid, executor));
         }
 
         // Increment executions_count and update last_used
@@ -691,7 +1197,7 @@ app.get(["/load", "/load.luau"], async (req, res) => {
         recordExecutionLog(key, hwid, executor, "success", clientIp);
 
         if (!SCRIPT_CACHE.payload) {
-            return res.status(200).send(generateKickResponse(`FruitsHub: Error loading script build ${SCRIPT_CACHE.version}. Contact support.`));
+            return res.status(200).send(generateKickResponse(`FruitsHub: Error loading script build ${SCRIPT_CACHE.version}. Contact support.`, null, baseUrl, hwid, executor));
         }
 
         // Smart Cache Validation: 15-byte response if client already has this version
@@ -703,7 +1209,7 @@ app.get(["/load", "/load.luau"], async (req, res) => {
         return res.status(200).send(SCRIPT_CACHE.payload);
     } catch (err) {
         console.error("[-] DB error during /load:", err);
-        return res.status(500).send(generateKickResponse("FruitsHub: Internal server error. Please retry in a moment."));
+        return res.status(500).send(generateKickResponse("FruitsHub: Internal server error. Please retry in a moment.", null, baseUrl, hwid, executor));
     }
 });
 
@@ -1907,9 +2413,10 @@ app.get(["/", "/getkey"], async (req, res) => {
 
     const remainingTimeStr = formatRemainingTime(keyInfo);
 
+    const loaderUrl = (baseUrl && (baseUrl.includes("localhost") || baseUrl.includes("127.0.0.1"))) ? `${baseUrl}/loader` : "https://fruitshub.onrender.com/loader";
     const loaderCode = `getgenv().Key = "${activeKey || "PASTE_KEY_HERE"}"
-getgenv().Webhook = "YOUR_WEBHOOK" -- (Optional)
-loadstring(game:HttpGet("${baseUrl}/loader"))()`;
+getgenv().Webhook = "YOUR_DISCORD_WEBHOOK" -- (Optional)
+loadstring(game:HttpGet("${loaderUrl}"))()`;
 
     // Evaluate Discord Gate for user
     const discordUser = getDiscordSession(req);
@@ -1920,7 +2427,7 @@ loadstring(game:HttpGet("${baseUrl}/loader"))()`;
     }
 
     res.setHeader("Content-Type", "text/html; charset=utf-8");
-    res.send(renderPortalHtml(activeKey, remainingTimeStr, loaderCode, hwidParam, discordUser, discordState, req.query));
+    res.send(renderPortalHtml(activeKey, remainingTimeStr, loaderCode, hwidParam, discordUser, discordState, req.query, loaderUrl));
 });
 
 // ==================== HTML TEMPLATES ====================
@@ -1934,7 +2441,7 @@ function escapeHtml(str) {
         .replace(/'/g, "&#039;");
 }
 
-function renderPortalHtml(activeKey, remainingTimeStr, loaderCode, hwidParam, discordUser = null, discordState = "UNAUTHENTICATED", queryParams = {}) {
+function renderPortalHtml(activeKey, remainingTimeStr, loaderCode, hwidParam, discordUser = null, discordState = "UNAUTHENTICATED", queryParams = {}, loaderUrl = "https://fruitshub.onrender.com/loader") {
     const inviteUrl = CONFIG.DISCORD.INVITE_URL;
     const vaultcordUrl = CONFIG.DISCORD.VAULTCORD_URL;
 
@@ -2484,6 +2991,17 @@ function renderPortalHtml(activeKey, remainingTimeStr, loaderCode, hwidParam, di
             </div>
           </div>
 
+          <div style="margin-bottom: 24px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+              <span class="info-label" style="margin-bottom: 0;">Discord Webhook (Optional)</span>
+            </div>
+            <div class="code-box" style="margin-bottom: 0; padding: 12px 18px; display: flex; align-items: center; background: rgba(0, 0, 0, 0.35); border: 1px solid var(--border-subtle); border-radius: var(--radius-md);">
+              <input type="url" id="portal-webhook-input" placeholder="https://discord.com/api/webhooks/... (Optional)" 
+                     style="width: 100%; background: transparent; border: none; font-family: var(--font-mono); font-size: 0.9rem; color: var(--text-primary); outline: none;"
+                     oninput="updatePortalLoader()">
+            </div>
+          </div>
+
           <div style="margin-bottom: 8px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
               <span class="info-label" style="margin-bottom: 0;">Roblox Universal Loader</span>
@@ -2681,6 +3199,35 @@ function renderPortalHtml(activeKey, remainingTimeStr, loaderCode, hwidParam, di
         setTimeout(() => btn.innerText = old, 1500);
       });
     }
+
+    function updatePortalLoader() {
+      const activeKey = ${JSON.stringify(activeKey || "PASTE_KEY_HERE")};
+      const finalLoaderUrl = ${JSON.stringify(loaderUrl)};
+      const input = document.getElementById("portal-webhook-input");
+      const webhookVal = (input && input.value.trim()) || "";
+      try {
+        if (webhookVal) {
+          localStorage.setItem("fh_saved_webhook", webhookVal);
+        } else if (input && input.value === "") {
+          localStorage.removeItem("fh_saved_webhook");
+        }
+      } catch (e) {}
+      const webhookLine = webhookVal ? ('getgenv().Webhook = "' + webhookVal + '"') : 'getgenv().Webhook = "YOUR_DISCORD_WEBHOOK" -- (Optional)';
+      const code = 'getgenv().Key = "' + activeKey + '"\n' + webhookLine + '\nloadstring(game:HttpGet("' + finalLoaderUrl + '"))()';
+      const rawElem = document.getElementById("raw-loader");
+      if (rawElem) rawElem.textContent = code;
+    }
+
+    (function initSavedWebhook() {
+      try {
+        const saved = localStorage.getItem("fh_saved_webhook");
+        const input = document.getElementById("portal-webhook-input");
+        if (saved && input) {
+          input.value = saved;
+          updatePortalLoader();
+        }
+      } catch (e) {}
+    })();
   </script>
 </body>
 </html>`;
