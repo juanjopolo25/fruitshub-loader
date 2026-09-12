@@ -2781,8 +2781,27 @@ app.post("/api/telemetry", async (req, res) => {
         gachaText: String(data.gachaText || "Available"),
         gachaCooldownEnd: Number(data.gachaCooldownEnd || 0),
         storage: data.storage || existing.storage || { counts: { Mythical: {}, Legendary: {}, Rare: {}, Common: {} }, totalCount: 0, maxCap: 1 },
-        sessionStats: data.sessionStats || existing.sessionStats || { uptime: "0m", server_hops: 0, quests: 0, fruitsStoredToday: 0, gachaRolls: 0, lastSavedFruit: "None" },
-        recentDrops: data.recentDrops || existing.recentDrops || [],
+        recentDrops: (() => {
+            const incoming = Array.isArray(data.recentDrops) ? data.recentDrops : [];
+            const previous = Array.isArray(existing.recentDrops) ? existing.recentDrops : [];
+            const merged = [];
+            const seen = new Set();
+            for (const d of [...incoming, ...previous]) {
+                if (!d || !d.name) continue;
+                const timeKey = d.timestamp || d.time || "";
+                const key = `${d.name}_${timeKey}_${d.source || ""}`;
+                if (!seen.has(key)) {
+                    seen.add(key);
+                    merged.push(d);
+                }
+            }
+            merged.sort((a, b) => {
+                const ta = a.timestamp || (a.time ? (a.time > 1e11 ? a.time : a.time * 1000) : 0);
+                const tb = b.timestamp || (b.time ? (b.time > 1e11 ? b.time : b.time * 1000) : 0);
+                return tb - ta;
+            });
+            return merged.slice(0, 100);
+        })(),
         lastSeen: now
     };
 
