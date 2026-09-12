@@ -569,6 +569,11 @@ if Key == "" and hasFs and isfile("FruitsHub/saved_key.txt") then
     end)
 end
 
+if Key ~= "" then
+    getgenv().Key = Key
+    getgenv().FruitsHubKey = Key
+end
+
 local localCached = hasFs and isfile(CachePath)
 local cachedVersion = (hasFs and isfile(VerPath)) and readfile(VerPath) or "none"
 
@@ -2835,6 +2840,44 @@ app.get("/api/user/telemetry", async (req, res) => {
         accounts,
         serverTime: now
     });
+});
+
+// 9.3 Remove Account from Active Telemetry
+app.all(["/api/user/telemetry/remove", "/api/user/telemetry/delete"], async (req, res) => {
+    const key = req.headers["x-fruitshub-key"] || req.query.key || (req.body && req.body.key);
+    const account = req.query.account || (req.body && req.body.account);
+    if (!key || !account) {
+        return res.status(400).json({ error: "Missing key or account" });
+    }
+    const keyValidation = await validateUserKey(String(key));
+    if (!keyValidation) {
+        return res.status(401).json({ error: "Invalid key" });
+    }
+    const accountMap = activeTelemetries.get(keyValidation.key);
+    if (accountMap && accountMap.has(account)) {
+        accountMap.delete(account);
+        console.log(`[+] Telemetry account removed: ${account} for key: ${keyValidation.key}`);
+        return res.status(200).json({ success: true, message: `Account ${account} removed` });
+    }
+    return res.status(200).json({ success: true, message: "Account was not active" });
+});
+
+app.delete("/api/user/telemetry", async (req, res) => {
+    const key = req.headers["x-fruitshub-key"] || req.query.key || (req.body && req.body.key);
+    const account = req.query.account || (req.body && req.body.account);
+    if (!key || !account) {
+        return res.status(400).json({ error: "Missing key or account" });
+    }
+    const keyValidation = await validateUserKey(String(key));
+    if (!keyValidation) {
+        return res.status(401).json({ error: "Invalid key" });
+    }
+    const accountMap = activeTelemetries.get(keyValidation.key);
+    if (accountMap && accountMap.has(account)) {
+        accountMap.delete(account);
+        return res.status(200).json({ success: true, message: `Account ${account} removed` });
+    }
+    return res.status(200).json({ success: true, message: "Account was not active" });
 });
 
 // 9.4 Static Brand Assets (Logos, Icons)
