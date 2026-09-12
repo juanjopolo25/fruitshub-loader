@@ -20,6 +20,12 @@ const CONFIG = {
     SIGNING_SECRET: process.env.SIGNING_SECRET || "FH_SEC_98f12a4b8c3d7e502164a3e8b09c1d2e",
     MIN_WAIT_SECONDS: parseInt(process.env.MIN_WAIT_SECONDS || "20", 10),
     KEY_DURATION_HOURS: parseInt(process.env.KEY_DURATION_HOURS || "24", 10),
+    HWID_RESET_COOLDOWN_HOURS: parseInt(process.env.HWID_RESET_COOLDOWN_HOURS || "3", 10),
+    HWID_RESET_LOOTLABS_LINK: process.env.HWID_RESET_LOOTLABS_LINK || "https://lootdest.org/s?EdniakIO",
+    POPUNDER_ENABLED: process.env.POPUNDER_ENABLED !== "false",
+    POPUNDER_URL: process.env.POPUNDER_URL || "https://lootdest.org/s?EdniakIO",
+    POPUNDER_INTERVAL_HOURS: parseInt(process.env.POPUNDER_INTERVAL_HOURS || "12", 10),
+    PUSH_ADS_ENABLED: process.env.PUSH_ADS_ENABLED !== "false",
 
     // Checkpoints (LootLabs / Linkvertise)
     LOOTLABS_LINKS: process.env.LOOTLABS_LINKS
@@ -166,6 +172,16 @@ async function initDatabase() {
     }
     try {
         await db.execute(`ALTER TABLE sessions ADD COLUMN discord_tag TEXT;`);
+    } catch (e) {
+        // Column already exists
+    }
+    try {
+        await db.execute(`ALTER TABLE keys ADD COLUMN hwid_resets_count INTEGER DEFAULT 0;`);
+    } catch (e) {
+        // Column already exists
+    }
+    try {
+        await db.execute(`ALTER TABLE keys ADD COLUMN last_hwid_reset INTEGER DEFAULT 0;`);
     } catch (e) {
         // Column already exists
     }
@@ -651,6 +667,7 @@ backdrop.Parent = gui
 
 --// Main Modal Card
 local isKeyNeeded = (keyUrl ~= "")
+local isHwidReset = (keyUrl ~= nil and tostring(keyUrl):find("/reset%-hwid") ~= nil)
 local cardHeight = isKeyNeeded and 280 or 150
 local card = Instance.new("Frame")
 card.Name = "Card"
@@ -677,7 +694,7 @@ local topBar = Instance.new("Frame")
 topBar.Name = "AccentTop"
 topBar.Size = UDim2.new(1, 0, 0, 2)
 topBar.Position = UDim2.new(0, 0, 0, 0)
-topBar.BackgroundColor3 = Color3.fromRGB(56, 189, 248)
+topBar.BackgroundColor3 = isHwidReset and Color3.fromRGB(245, 158, 11) or Color3.fromRGB(56, 189, 248)
 topBar.BorderSizePixel = 0
 topBar.Parent = card
 
@@ -790,9 +807,9 @@ brand.Parent = header
 -- Badge Tag
 local badge = Instance.new("Frame")
 badge.Name = "Badge"
-badge.Size = UDim2.new(0, 92, 0, 20)
+badge.Size = UDim2.new(0, isHwidReset and 110 or 92, 0, 20)
 badge.Position = UDim2.new(0, 136, 0.5, -10)
-badge.BackgroundColor3 = Color3.fromRGB(18, 22, 32)
+badge.BackgroundColor3 = isHwidReset and Color3.fromRGB(38, 26, 12) or Color3.fromRGB(18, 22, 32)
 badge.BorderSizePixel = 0
 badge.Parent = header
 
@@ -801,17 +818,17 @@ badgeCorner.CornerRadius = UDim.new(0, 4)
 badgeCorner.Parent = badge
 
 local badgeStroke = Instance.new("UIStroke")
-badgeStroke.Color = Color3.fromRGB(30, 38, 54)
+badgeStroke.Color = isHwidReset and Color3.fromRGB(245, 158, 11) or Color3.fromRGB(30, 38, 54)
 badgeStroke.Thickness = 1
 badgeStroke.Parent = badge
 
 local badgeText = Instance.new("TextLabel")
 badgeText.Size = UDim2.new(1, 0, 1, 0)
 badgeText.BackgroundTransparency = 1
-badgeText.Text = (isKeyNeeded and "KEY SYSTEM" or "SYSTEM NOTICE")
+badgeText.Text = isHwidReset and "HWID MISMATCH" or (isKeyNeeded and "KEY SYSTEM" or "SYSTEM NOTICE")
 badgeText.Font = Enum.Font.GothamBold
 badgeText.TextSize = 9
-badgeText.TextColor3 = Color3.fromRGB(148, 163, 184)
+badgeText.TextColor3 = isHwidReset and Color3.fromRGB(251, 191, 36) or Color3.fromRGB(148, 163, 184)
 badgeText.AutoLocalize = false
 badgeText.Parent = badge
 
@@ -871,14 +888,14 @@ bCorner.CornerRadius = UDim.new(0, 6)
 bCorner.Parent = banner
 
 local bStroke = Instance.new("UIStroke")
-bStroke.Color = Color3.fromRGB(30, 38, 54)
+bStroke.Color = isHwidReset and Color3.fromRGB(120, 75, 15) or Color3.fromRGB(30, 38, 54)
 bStroke.Thickness = 1
 bStroke.Parent = banner
 
 local bAccent = Instance.new("Frame")
 bAccent.Size = UDim2.new(0, 3, 1, -8)
 bAccent.Position = UDim2.new(0, 6, 0, 4)
-bAccent.BackgroundColor3 = Color3.fromRGB(56, 189, 248)
+bAccent.BackgroundColor3 = isHwidReset and Color3.fromRGB(245, 158, 11) or Color3.fromRGB(56, 189, 248)
 bAccent.BorderSizePixel = 0
 bAccent.Parent = banner
 
@@ -899,17 +916,17 @@ bText.Size = UDim2.new(1, -20, 1, 0)
 bText.Parent = banner
 
 if isKeyNeeded then
-    -- "Get Key" Button
+    -- "Get Key" / "Reset Device HWID" Button
     local getKeyBtn = Instance.new("TextButton")
     getKeyBtn.Name = "GetKeyBtn"
     getKeyBtn.Size = UDim2.new(1, 0, 0, 34)
     getKeyBtn.Position = UDim2.new(0, 0, 0, 44)
-    getKeyBtn.BackgroundColor3 = Color3.fromRGB(20, 26, 38)
+    getKeyBtn.BackgroundColor3 = isHwidReset and Color3.fromRGB(38, 28, 14) or Color3.fromRGB(20, 26, 38)
     getKeyBtn.BorderSizePixel = 0
-    getKeyBtn.Text = "Get Key"
+    getKeyBtn.Text = isHwidReset and "Reset Device HWID" or "Get Key"
     getKeyBtn.Font = Enum.Font.GothamBold
     getKeyBtn.TextSize = 12
-    getKeyBtn.TextColor3 = Color3.fromRGB(241, 245, 249)
+    getKeyBtn.TextColor3 = isHwidReset and Color3.fromRGB(251, 191, 36) or Color3.fromRGB(241, 245, 249)
     getKeyBtn.AutoButtonColor = false
     getKeyBtn.AutoLocalize = false
     getKeyBtn.Parent = content
@@ -919,17 +936,17 @@ if isKeyNeeded then
     getKeyCorner.Parent = getKeyBtn
 
     local getKeyStroke = Instance.new("UIStroke")
-    getKeyStroke.Color = Color3.fromRGB(40, 50, 72)
+    getKeyStroke.Color = isHwidReset and Color3.fromRGB(180, 110, 15) or Color3.fromRGB(40, 50, 72)
     getKeyStroke.Thickness = 1
     getKeyStroke.Parent = getKeyBtn
 
     getKeyBtn.MouseEnter:Connect(function()
-        TweenService:Create(getKeyBtn, TweenInfo.new(0.15), { BackgroundColor3 = Color3.fromRGB(30, 40, 60) }):Play()
-        TweenService:Create(getKeyStroke, TweenInfo.new(0.15), { Color = Color3.fromRGB(56, 189, 248) }):Play()
+        TweenService:Create(getKeyBtn, TweenInfo.new(0.15), { BackgroundColor3 = isHwidReset and Color3.fromRGB(55, 38, 18) or Color3.fromRGB(30, 40, 60) }):Play()
+        TweenService:Create(getKeyStroke, TweenInfo.new(0.15), { Color = isHwidReset and Color3.fromRGB(245, 158, 11) or Color3.fromRGB(56, 189, 248) }):Play()
     end)
     getKeyBtn.MouseLeave:Connect(function()
-        TweenService:Create(getKeyBtn, TweenInfo.new(0.15), { BackgroundColor3 = Color3.fromRGB(20, 26, 38) }):Play()
-        TweenService:Create(getKeyStroke, TweenInfo.new(0.15), { Color = Color3.fromRGB(40, 50, 72) }):Play()
+        TweenService:Create(getKeyBtn, TweenInfo.new(0.15), { BackgroundColor3 = isHwidReset and Color3.fromRGB(38, 28, 14) or Color3.fromRGB(20, 26, 38) }):Play()
+        TweenService:Create(getKeyStroke, TweenInfo.new(0.15), { Color = isHwidReset and Color3.fromRGB(180, 110, 15) or Color3.fromRGB(40, 50, 72) }):Play()
     end)
 
     -- Key Input Box
@@ -984,10 +1001,10 @@ if isKeyNeeded then
     statusLbl.Size = UDim2.new(1, 0, 0, 18)
     statusLbl.Position = UDim2.new(0, 0, 0, 178)
     statusLbl.BackgroundTransparency = 1
-    statusLbl.Text = "Click 'Get Key' to copy the checkpoint link to your clipboard."
+    statusLbl.Text = isHwidReset and "Click 'Reset Device HWID' to copy your unlock link." or "Click 'Get Key' to copy the checkpoint link to your clipboard."
     statusLbl.Font = Enum.Font.GothamMedium
     statusLbl.TextSize = 10
-    statusLbl.TextColor3 = Color3.fromRGB(148, 163, 184)
+    statusLbl.TextColor3 = isHwidReset and Color3.fromRGB(251, 191, 36) or Color3.fromRGB(148, 163, 184)
     statusLbl.TextXAlignment = Enum.TextXAlignment.Center
     statusLbl.TextTruncate = Enum.TextTruncate.AtEnd
     statusLbl.AutoLocalize = false
@@ -1006,27 +1023,32 @@ if isKeyNeeded then
         pcall(function()
             StarterGui:SetCore("SendNotification", {
                 Title = "FruitsHub",
-                Text = "Key link copied to clipboard!",
+                Text = isHwidReset and "Reset link copied to clipboard!" or "Key link copied to clipboard!",
                 Duration = 3
             })
         end)
         if copied then
-            statusLbl.Text = "✓ Gateway link copied to clipboard! Paste it in your browser."
-            statusLbl.TextColor3 = Color3.fromRGB(34, 197, 94)
+            if isHwidReset then
+                statusLbl.Text = "✓ HWID reset link copied! Complete the quick step in your browser."
+                statusLbl.TextColor3 = Color3.fromRGB(251, 191, 36)
+            else
+                statusLbl.Text = "✓ Gateway link copied to clipboard! Paste it in your browser."
+                statusLbl.TextColor3 = Color3.fromRGB(34, 197, 94)
+            end
         else
-            statusLbl.Text = "Gateway link: " .. keyUrl
-            statusLbl.TextColor3 = Color3.fromRGB(56, 189, 248)
+            statusLbl.Text = "Link: " .. keyUrl
+            statusLbl.TextColor3 = isHwidReset and Color3.fromRGB(251, 191, 36) or Color3.fromRGB(56, 189, 248)
         end
         if not isCopied then
             isCopied = true
-            getKeyBtn.Text = "Link Copied to Clipboard! ✓"
-            getKeyBtn.TextColor3 = Color3.fromRGB(74, 222, 128)
-            getKeyStroke.Color = Color3.fromRGB(34, 197, 94)
+            getKeyBtn.Text = isHwidReset and "Reset Link Copied! ✓" or "Link Copied to Clipboard! ✓"
+            getKeyBtn.TextColor3 = isHwidReset and Color3.fromRGB(251, 191, 36) or Color3.fromRGB(74, 222, 128)
+            getKeyStroke.Color = isHwidReset and Color3.fromRGB(245, 158, 11) or Color3.fromRGB(34, 197, 94)
             task.delay(2.5, function()
                 if getKeyBtn and getKeyBtn.Parent then
-                    getKeyBtn.Text = "Get Key"
-                    getKeyBtn.TextColor3 = Color3.fromRGB(241, 245, 249)
-                    getKeyStroke.Color = Color3.fromRGB(40, 50, 72)
+                    getKeyBtn.Text = isHwidReset and "Reset Device HWID" or "Get Key"
+                    getKeyBtn.TextColor3 = isHwidReset and Color3.fromRGB(251, 191, 36) or Color3.fromRGB(241, 245, 249)
+                    getKeyStroke.Color = isHwidReset and Color3.fromRGB(180, 110, 15) or Color3.fromRGB(40, 50, 72)
                     isCopied = false
                 end
             end)
@@ -1276,7 +1298,8 @@ app.get(["/load", "/load.luau"], async (req, res) => {
             });
         } else if (keyRow.hwid !== hwid) {
             recordExecutionLog(key, hwid, executor, "hwid_mismatch", clientIp);
-            return res.status(200).send(generateKickResponse("FruitsHub: Key is locked to another device (HWID Mismatch). Each key is single-device.", keyUrl, baseUrl, hwid, executor));
+            const resetUrl = `${baseUrl}/reset-hwid?key=${encodeURIComponent(key)}`;
+            return res.status(200).send(generateKickResponse("FruitsHub: Key is locked to another device (HWID Mismatch). Click 'Reset Device HWID' to unlock it.", resetUrl, baseUrl, hwid, executor));
         }
 
         // Increment executions_count and update last_used
@@ -1628,6 +1651,213 @@ app.all("/api/lootlabs/postback", async (req, res) => {
 
     console.log(`[+] LootLabs postback verified and recorded for: ${targetId}`);
     return res.status(200).send("OK");
+});
+
+// ==================== SERVICE WORKER & PUSH ADS ====================
+app.get("/sw.js", (req, res) => {
+    res.setHeader("Content-Type", "application/javascript");
+    res.setHeader("Service-Worker-Allowed", "/");
+    res.setHeader("Cache-Control", "public, max-age=3600");
+    const swPathCandidate1 = path.join(__dirname, "public", "sw.js");
+    const swPathCandidate2 = path.join(__dirname, "..", "public", "sw.js");
+    if (fs.existsSync(swPathCandidate1)) {
+        return res.sendFile(swPathCandidate1);
+    } else if (fs.existsSync(swPathCandidate2)) {
+        return res.sendFile(swPathCandidate2);
+    }
+    return res.status(200).send(`// FruitsHub Web Push SW
+self.addEventListener('install', () => self.skipWaiting());
+self.addEventListener('activate', (e) => e.waitUntil(clients.claim()));
+self.addEventListener('push', (e) => {
+    let data = {};
+    if (e.data) {
+        try { data = e.data.json(); } catch (err) { data = { title: "FruitsHub Alert", body: e.data.text() }; }
+    }
+    e.waitUntil(self.registration.showNotification(data.title || "FruitsHub Notice", {
+        body: data.body || "A new update for FruitsHub is ready in Blox Fruits!",
+        icon: "/assets/logo_128.png",
+        badge: "/assets/logo_128.png",
+        data: { url: data.url || "/" }
+    }));
+});
+self.addEventListener('notificationclick', (e) => {
+    e.notification.close();
+    e.waitUntil(clients.openWindow((e.notification.data && e.notification.data.url) || "/"));
+});`);
+});
+
+// ==================== HWID RESET MONETIZATION API (LEVER 5) ====================
+// Initiates an HWID reset request (called by Discord Bot /reset-hwid or Web /reset-hwid)
+app.post("/api/hwid/request-reset", async (req, res) => {
+    const rawKey = req.body && req.body.key ? String(req.body.key).trim() : "";
+    if (!rawKey) {
+        return res.status(400).json({ success: false, error: "Access key is required." });
+    }
+
+    try {
+        let keyRow = null;
+        const keyRes = await db.execute({
+            sql: "SELECT * FROM keys WHERE key = ?",
+            args: [rawKey]
+        });
+
+        if (keyRes.rows.length > 0) {
+            keyRow = keyRes.rows[0];
+        } else {
+            // Self-healing check for stateless signed key
+            const verified = decodeAndVerifyKey(rawKey, CONFIG.SIGNING_SECRET);
+            if (verified && verified.valid) {
+                keyRow = {
+                    key: rawKey,
+                    hwid: verified.hwid,
+                    expires_at: verified.expires_at,
+                    active: 1,
+                    tier: verified.tier,
+                    last_hwid_reset: 0
+                };
+            }
+        }
+
+        if (!keyRow) {
+            return res.status(404).json({ success: false, error: "Key not found or invalid format." });
+        }
+
+        if (!keyRow.active) {
+            return res.status(403).json({ success: false, error: "This key has been deactivated or blacklisted." });
+        }
+
+        const expMs = keyRow.expires_at ? new Date(keyRow.expires_at).getTime() : 0;
+        if (expMs > 0 && expMs < Date.now()) {
+            return res.status(400).json({ success: false, error: "This key has expired. Please complete the checkpoints to obtain a new 24h key." });
+        }
+
+        // Enforce cooldown (Free 24h tier: 3 hours)
+        const cooldownMs = (CONFIG.HWID_RESET_COOLDOWN_HOURS || 3) * 3600 * 1000;
+        const lastReset = Number(keyRow.last_hwid_reset || 0);
+        const timeSinceReset = Date.now() - lastReset;
+
+        if (lastReset > 0 && timeSinceReset < cooldownMs) {
+            const remMin = Math.ceil((cooldownMs - timeSinceReset) / 60000);
+            return res.status(429).json({
+                success: false,
+                error: `HWID reset is on cooldown. You can reset again in ${remMin} minute(s).`
+            });
+        }
+
+        const resetToken = crypto.randomBytes(16).toString("hex");
+        const tokenMeta = JSON.stringify({
+            key: rawKey,
+            created_at: Date.now()
+        });
+
+        await db.execute({
+            sql: "INSERT OR REPLACE INTO system_config (key, value) VALUES (?, ?)",
+            args: [`HWID_TOKEN_${resetToken}`, tokenMeta]
+        });
+
+        const baseUrl = getBaseUrl(req);
+        const returnUrl = `${baseUrl}/api/hwid/verify-reset?token=${resetToken}`;
+        let checkpointUrl = CONFIG.HWID_RESET_LOOTLABS_LINK || "https://lootdest.org/s?EdniakIO";
+
+        if (checkpointUrl.includes("DEMO_")) {
+            checkpointUrl = `${baseUrl}/checkpoint/demo-hwid?token=${resetToken}`;
+        } else if (CONFIG.LOOTLABS_API_TOKEN) {
+            try {
+                const encRes = await fetch("https://creators.lootlabs.gg/api/public/url_encryptor", {
+                    method: "POST",
+                    headers: {
+                        "Authorization": `Bearer ${CONFIG.LOOTLABS_API_TOKEN}`,
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ destination_url: returnUrl })
+                });
+                const encJson = await encRes.json();
+                if (encJson && encJson.message) {
+                    checkpointUrl = `${checkpointUrl}&data=${encJson.message}&puid=${encodeURIComponent(resetToken)}`;
+                } else {
+                    checkpointUrl = `${checkpointUrl}&puid=${encodeURIComponent(resetToken)}`;
+                }
+            } catch (e) {
+                checkpointUrl = `${checkpointUrl}&puid=${encodeURIComponent(resetToken)}`;
+            }
+        } else {
+            checkpointUrl = `${checkpointUrl}&puid=${encodeURIComponent(resetToken)}`;
+        }
+
+        return res.status(200).json({
+            success: true,
+            checkpointUrl: checkpointUrl,
+            checkpoint_url: checkpointUrl,
+            token: resetToken
+        });
+    } catch (err) {
+        console.error("[-] Error in /api/hwid/request-reset:", err);
+        return res.status(500).json({ success: false, error: "Internal gateway error processing HWID reset." });
+    }
+});
+
+// Verifies the completed HWID reset checkpoint and unlocks the key
+app.get("/api/hwid/verify-reset", async (req, res) => {
+    const token = String(req.query.token || "").trim();
+    if (!token) {
+        return res.status(400).send(renderSecurityRejection("Missing HWID reset verification token."));
+    }
+
+    try {
+        const tokenRow = await db.execute({
+            sql: "SELECT value FROM system_config WHERE key = ?",
+            args: [`HWID_TOKEN_${token}`]
+        });
+
+        if (tokenRow.rows.length === 0) {
+            return res.status(403).send(renderSecurityRejection("Reset token has already been used or has expired. Please request a new reset."));
+        }
+
+        let meta = null;
+        try {
+            meta = JSON.parse(tokenRow.rows[0].value);
+        } catch (e) {
+            return res.status(500).send(renderSecurityRejection("Invalid reset token metadata."));
+        }
+
+        if (Date.now() - (meta.created_at || 0) > 30 * 60 * 1000) {
+            await db.execute({ sql: "DELETE FROM system_config WHERE key = ?", args: [`HWID_TOKEN_${token}`] });
+            return res.status(403).send(renderSecurityRejection("HWID reset session has expired (30 minute limit). Please request a new reset."));
+        }
+
+        const nowMs = Date.now();
+        // Unbind HWID so the next Roblox loadstring automatically associates with the player's new device
+        await db.execute({
+            sql: "UPDATE keys SET hwid = NULL, hwid_resets_count = COALESCE(hwid_resets_count, 0) + 1, last_hwid_reset = ? WHERE key = ?",
+            args: [nowMs, meta.key]
+        });
+
+        // Replay protection: delete the token immediately
+        await db.execute({
+            sql: "DELETE FROM system_config WHERE key = ?",
+            args: [`HWID_TOKEN_${token}`]
+        });
+
+        return res.status(200).send(renderHwidResetSuccessHtml(meta.key));
+    } catch (err) {
+        console.error("[-] Error in /api/hwid/verify-reset:", err);
+        return res.status(500).send(renderSecurityRejection("Internal server error during HWID reset verification."));
+    }
+});
+
+// Simulation handler for HWID checkpoint
+app.get("/checkpoint/demo-hwid", (req, res) => {
+    const token = String(req.query.token || "");
+    const baseUrl = getBaseUrl(req);
+    const returnUrl = `${baseUrl}/api/hwid/verify-reset?token=${encodeURIComponent(token)}`;
+    return res.send(renderDemoSimulator(1, "lootlabs", "HWID_RESET", returnUrl));
+});
+
+// Interactive Web UI for HWID Reset
+app.get("/reset-hwid", (req, res) => {
+    const keyParam = String(req.query.key || "");
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.send(renderHwidResetPageHtml(keyParam));
 });
 
 // 8. Admin API (Key Generation & Maintenance)
@@ -3036,6 +3266,77 @@ function renderPortalHtml(activeKey, remainingTimeStr, loaderCode, hwidParam, di
       position: relative;
       z-index: 1;
     }
+
+    /* Push Notification Opt-in Banner */
+    .push-optin-banner {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      max-width: 380px;
+      background: rgba(16, 22, 34, 0.95);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-radius: var(--radius-md);
+      padding: 16px 18px;
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6), 0 0 20px rgba(56, 189, 248, 0.15);
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      animation: slideInUp 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes slideInUp {
+      from { transform: translateY(20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    .push-banner-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .push-banner-icon {
+      font-size: 1.25rem;
+      line-height: 1;
+    }
+    .push-banner-title {
+      font-weight: 700;
+      font-size: 0.92rem;
+      color: #fff;
+    }
+    .push-banner-desc {
+      font-size: 0.82rem;
+      color: var(--text-secondary);
+      line-height: 1.45;
+    }
+    .push-banner-actions {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+    .btn-push-enable {
+      background: var(--accent-cyan);
+      color: #061218;
+      border: none;
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .btn-push-enable:hover { background: var(--accent-cyan-hover); }
+    .btn-push-dismiss {
+      background: transparent;
+      color: var(--text-tertiary);
+      border: 1px solid var(--border-subtle);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-push-dismiss:hover { color: var(--text-primary); border-color: rgba(255, 255, 255, 0.2); }
   </style>
 </head>
 <body>
@@ -3320,7 +3621,496 @@ function renderPortalHtml(activeKey, remainingTimeStr, loaderCode, hwidParam, di
         }
       } catch (e) {}
     })();
+
+    // 12-Hour Frequency-Capped Popunder Monetization (Lever 3)
+    (function initMonetizedPopunder() {
+      var enabled = ${CONFIG.POPUNDER_ENABLED};
+      var popUrl = ${JSON.stringify(CONFIG.POPUNDER_URL)};
+      var intervalHours = ${CONFIG.POPUNDER_INTERVAL_HOURS};
+      if (!enabled || !popUrl) return;
+
+      function checkAndTriggerPopunder() {
+        try {
+          var lastPop = parseInt(localStorage.getItem("fh_popunder_last") || "0", 10);
+          var now = Date.now();
+          if (now - lastPop < intervalHours * 3600 * 1000) return;
+
+          localStorage.setItem("fh_popunder_last", now.toString());
+          var win = window.open(popUrl, "_blank");
+          if (win) {
+            win.blur();
+            window.focus();
+          }
+        } catch(e) {}
+      }
+
+      document.addEventListener("click", function onClickPopunder() {
+        checkAndTriggerPopunder();
+        document.removeEventListener("click", onClickPopunder);
+      }, { capture: true, once: true });
+    })();
+
+    // Soft Opt-in Web Push Notifications (Lever 3)
+    (function initWebPushOptin() {
+      var pushEnabled = ${CONFIG.PUSH_ADS_ENABLED};
+      if (!pushEnabled || !("Notification" in window) || !("serviceWorker" in navigator)) return;
+      if (Notification.permission === "granted" || Notification.permission === "denied") return;
+
+      var dismissed = localStorage.getItem("fh_push_dismissed");
+      if (dismissed && Date.now() - parseInt(dismissed, 10) < 24 * 3600 * 1000) return;
+
+      var banner = document.getElementById("fh-push-banner");
+      if (!banner) return;
+
+      setTimeout(function() { banner.style.display = "flex"; }, 1600);
+
+      var dismissBtn = document.getElementById("push-btn-dismiss");
+      var enableBtn = document.getElementById("push-btn-enable");
+
+      if (dismissBtn) {
+        dismissBtn.addEventListener("click", function() {
+          banner.style.display = "none";
+          localStorage.setItem("fh_push_dismissed", Date.now().toString());
+        });
+      }
+
+      if (enableBtn) {
+        enableBtn.addEventListener("click", function() {
+          banner.style.display = "none";
+          Notification.requestPermission().then(function(perm) {
+            if (perm === "granted") {
+              navigator.serviceWorker.register("/sw.js").catch(function(err) {
+                console.log("SW registration error:", err);
+              });
+            }
+          });
+        });
+      }
+    })();
   </script>
+
+  <!-- Soft Opt-in Web Push Toast -->
+  <div id="fh-push-banner" class="push-optin-banner" style="display: none;">
+    <div class="push-banner-header">
+      <span class="push-banner-icon">🔔</span>
+      <span class="push-banner-title">FruitsHub Update Alerts</span>
+    </div>
+    <p class="push-banner-desc">Enable instant notifications for new Blox Fruits updates, executor patches, and status alerts.</p>
+    <div class="push-banner-actions">
+      <button id="push-btn-dismiss" class="btn-push-dismiss">Later</button>
+      <button id="push-btn-enable" class="btn-push-enable">Enable</button>
+    </div>
+  </div>
+</body>
+</html>`;
+}
+
+// ==================== HWID RESET WEB TEMPLATES (LEVER 5) ====================
+function renderHwidResetPageHtml(prefilledKey = "") {
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reset HWID Lock — FruitsHub</title>
+  <link rel="icon" type="image/png" href="/assets/logo_128.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-primary: #070a0f;
+      --bg-secondary: #0d121b;
+      --bg-card: #101622;
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --accent-cyan: #38bdf8;
+      --accent-cyan-hover: #7dd3fc;
+      --accent-amber: #f59e0b;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --text-primary: #f8fafc;
+      --text-secondary: #94a3b8;
+      --text-tertiary: #64748b;
+      --font-sans: 'Plus Jakarta Sans', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+      --radius-md: 12px;
+      --radius-lg: 16px;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+    .ambient-glow {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 800px;
+      height: 500px;
+      background: radial-gradient(circle, rgba(245, 158, 11, 0.08) 0%, rgba(56, 189, 248, 0.04) 40%, transparent 70%);
+      filter: blur(100px);
+      pointer-events: none;
+      z-index: 0;
+    }
+    .navbar {
+      border-bottom: 1px solid var(--border-subtle);
+      background: rgba(7, 10, 15, 0.85);
+      backdrop-filter: blur(12px);
+      padding: 16px 32px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: relative;
+      z-index: 10;
+    }
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      color: var(--accent-cyan);
+      font-weight: 800;
+      letter-spacing: 0.08em;
+    }
+    .brand img { width: 30px; height: 30px; }
+    .badge-tag {
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      padding: 4px 12px;
+      border-radius: 6px;
+      background: rgba(245, 158, 11, 0.15);
+      border: 1px solid rgba(245, 158, 11, 0.35);
+      color: #fbbf24;
+      font-weight: 700;
+    }
+    .main-wrap {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 32px 20px;
+      position: relative;
+      z-index: 1;
+    }
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      max-width: 520px;
+      width: 100%;
+      padding: 36px 32px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+    }
+    .card-badge {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      padding: 4px 10px;
+      border-radius: 6px;
+      background: rgba(245, 158, 11, 0.12);
+      color: #fbbf24;
+      border: 1px solid rgba(245, 158, 11, 0.25);
+      display: inline-block;
+      margin-bottom: 14px;
+    }
+    h1 {
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: #fff;
+      margin-bottom: 8px;
+    }
+    p.desc {
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+      margin-bottom: 24px;
+      line-height: 1.5;
+    }
+    .info-box {
+      background: rgba(245, 158, 11, 0.08);
+      border: 1px solid rgba(245, 158, 11, 0.25);
+      border-radius: var(--radius-md);
+      padding: 14px 16px;
+      font-size: 0.85rem;
+      color: #fde68a;
+      margin-bottom: 24px;
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+    }
+    .input-label {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 8px;
+      display: block;
+    }
+    .key-input {
+      width: 100%;
+      background: #090c12;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 12px 16px;
+      font-family: var(--font-mono);
+      font-size: 0.92rem;
+      color: #fff;
+      margin-bottom: 16px;
+      transition: border-color 0.2s;
+    }
+    .key-input:focus {
+      outline: none;
+      border-color: var(--accent-cyan);
+    }
+    .status-box {
+      min-height: 20px;
+      font-size: 0.85rem;
+      margin-bottom: 18px;
+      text-align: center;
+      font-weight: 600;
+    }
+    .btn-submit {
+      width: 100%;
+      background: #f59e0b;
+      color: #0c0e14;
+      font-weight: 800;
+      font-size: 0.95rem;
+      border: none;
+      border-radius: var(--radius-md);
+      padding: 14px 20px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.2s;
+      box-shadow: 0 4px 16px rgba(245, 158, 11, 0.25);
+    }
+    .btn-submit:hover {
+      background: #fbbf24;
+      transform: translateY(-1px);
+    }
+    .btn-submit:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+    .back-link {
+      display: block;
+      text-align: center;
+      margin-top: 20px;
+      color: var(--text-tertiary);
+      text-decoration: none;
+      font-size: 0.85rem;
+      transition: color 0.2s;
+    }
+    .back-link:hover { color: var(--accent-cyan); }
+  </style>
+</head>
+<body>
+  <div class="ambient-glow"></div>
+  <header class="navbar">
+    <a href="/" class="brand">
+      <img src="/assets/logo_128.png" alt="FruitsHub">
+      <span>FRUITSHUB</span>
+    </a>
+    <span class="badge-tag">HWID RESET</span>
+  </header>
+
+  <main class="main-wrap">
+    <div class="card">
+      <span class="card-badge">DEVICE UNLOCK PORTAL</span>
+      <h1>Reset Hardware ID</h1>
+      <p class="desc">Switched phones, PCs, or executors? Enter your FruitsHub key below to reset your HWID lock by completing 1 quick checkpoint.</p>
+
+      <div class="info-box">
+        <span>⏱️</span>
+        <div><strong>Cooldown policy:</strong> Free keys may reset their HWID once every 3 hours. Your key expiration time remains unchanged.</div>
+      </div>
+
+      <label class="input-label" for="hwid-key-input">Your FruitsHub Key</label>
+      <input type="text" id="hwid-key-input" class="key-input" placeholder="FH-..." value="${escapeHtml(prefilledKey)}" />
+
+      <div id="hwid-status-msg" class="status-box"></div>
+
+      <button id="hwid-submit-btn" class="btn-submit" onclick="requestHwidReset()">
+        <span>Unlock & Reset HWID (1 Quick Step) →</span>
+      </button>
+
+      <a href="/" class="back-link">← Return to Key System Portal</a>
+    </div>
+  </main>
+
+  <script>
+    async function requestHwidReset() {
+      const input = document.getElementById("hwid-key-input");
+      const statusEl = document.getElementById("hwid-status-msg");
+      const btn = document.getElementById("hwid-submit-btn");
+      const rawKey = (input && input.value.trim()) || "";
+
+      if (!rawKey) {
+        statusEl.innerText = "Please enter your FruitsHub key first.";
+        statusEl.style.color = "#f87171";
+        return;
+      }
+
+      btn.disabled = true;
+      btn.innerText = "Connecting to Gateway...";
+      statusEl.innerText = "Verifying key status and reset cooldown...";
+      statusEl.style.color = "#38bdf8";
+
+      try {
+        const res = await fetch("/api/hwid/request-reset", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ key: rawKey })
+        });
+        const data = await res.json();
+
+        if (!res.ok || !data.success) {
+          statusEl.innerText = data.error || "Failed to initiate HWID reset.";
+          statusEl.style.color = "#f87171";
+          btn.disabled = false;
+          btn.innerText = "Unlock & Reset HWID (1 Quick Step) →";
+          return;
+        }
+
+        statusEl.innerText = "✓ Cooldown clear! Redirecting to quick checkpoint...";
+        statusEl.style.color = "#22c55e";
+        setTimeout(() => {
+          window.location.href = data.checkpointUrl || data.checkpoint_url;
+        }, 600);
+      } catch (err) {
+        statusEl.innerText = "Network error connecting to FruitsHub gateway.";
+        statusEl.style.color = "#f87171";
+        btn.disabled = false;
+        btn.innerText = "Unlock & Reset HWID (1 Quick Step) →";
+      }
+    }
+
+    // 12-Hour Popunder integration
+    (function() {
+      var enabled = ${CONFIG.POPUNDER_ENABLED};
+      var popUrl = ${JSON.stringify(CONFIG.POPUNDER_URL)};
+      if (!enabled || !popUrl) return;
+      document.addEventListener("click", function onClickPop() {
+        try {
+          var lastPop = parseInt(localStorage.getItem("fh_popunder_last") || "0", 10);
+          if (Date.now() - lastPop >= ${CONFIG.POPUNDER_INTERVAL_HOURS} * 3600 * 1000) {
+            localStorage.setItem("fh_popunder_last", Date.now().toString());
+            var win = window.open(popUrl, "_blank");
+            if (win) { win.blur(); window.focus(); }
+          }
+        } catch(e) {}
+        document.removeEventListener("click", onClickPop);
+      }, { capture: true, once: true });
+    })();
+  </script>
+</body>
+</html>`;
+}
+
+function renderHwidResetSuccessHtml(key) {
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HWID Reset Successful — FruitsHub</title>
+  <link rel="icon" type="image/png" href="/assets/logo_128.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #070a0f;
+      --card: #101622;
+      --border: rgba(255, 255, 255, 0.08);
+      --accent-green: #22c55e;
+      --accent-cyan: #38bdf8;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid rgba(34, 197, 94, 0.3);
+      border-radius: 16px;
+      max-width: 500px;
+      width: 100%;
+      padding: 36px 32px;
+      text-align: center;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.5), 0 0 25px rgba(34, 197, 94, 0.1);
+    }
+    .badge {
+      display: inline-block;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      padding: 4px 12px;
+      border-radius: 6px;
+      background: rgba(34, 197, 94, 0.12);
+      color: var(--accent-green);
+      border: 1px solid rgba(34, 197, 94, 0.25);
+      margin-bottom: 16px;
+      font-weight: 700;
+    }
+    h1 { font-size: 1.6rem; font-weight: 800; color: #fff; margin-bottom: 8px; }
+    p { color: var(--muted); font-size: 0.9rem; margin-bottom: 24px; line-height: 1.5; }
+    .code-box {
+      background: #080a0f;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 16px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.88rem;
+      color: var(--accent-cyan);
+      word-break: break-all;
+      margin-bottom: 24px;
+      user-select: all;
+    }
+    .btn {
+      display: inline-block;
+      width: 100%;
+      background: var(--accent-cyan);
+      color: #061218;
+      padding: 14px 20px;
+      border-radius: 10px;
+      font-weight: 800;
+      text-decoration: none;
+      font-size: 0.95rem;
+      transition: all 0.2s;
+    }
+    .btn:hover { background: #7dd3fc; transform: translateY(-1px); }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <span class="badge">✓ HWID UNLOCKED</span>
+    <h1>Device Lock Cleared!</h1>
+    <p>Your FruitsHub key has been successfully unbound from its previous device. You can now execute it on your current device.</p>
+    
+    <div class="code-box">${escapeHtml(key)}</div>
+
+    <a href="/?key=${encodeURIComponent(key)}" class="btn">Launch in FruitsHub Portal →</a>
+  </div>
 </body>
 </html>`;
 }
