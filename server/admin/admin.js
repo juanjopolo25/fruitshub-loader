@@ -778,7 +778,7 @@ const AdminApp = (() => {
   function copyLoaderWithKey(key) {
     const origin = window.location.origin;
     const baseUrl = (origin.includes("localhost") || origin.includes("127.0.0.1")) ? origin : "https://fruitshub.onrender.com";
-    const loaderCode = `getgenv().Key = "${key}"\ngetgenv().Webhook = "YOUR_DISCORD_WEBHOOK" -- (Optional)\nloadstring(game:HttpGet("${baseUrl}/loader"))()`;
+    const loaderCode = `getgenv().Webhook = "YOUR_DISCORD_WEBHOOK" -- (Optional)\nloadstring(game:HttpGet("${baseUrl}/loader"))()`;
     if (!navigator.clipboard) return;
     navigator.clipboard.writeText(loaderCode).then(() => {
       showToast("Roblox loader snippet copied to clipboard!", "success");

@@ -2769,8 +2769,7 @@ app.get(["/", "/getkey"], async (req, res) => {
     const remainingTimeStr = formatRemainingTime(keyInfo);
 
     const loaderUrl = (baseUrl && (baseUrl.includes("localhost") || baseUrl.includes("127.0.0.1"))) ? `${baseUrl}/loader` : "https://fruitshub.onrender.com/loader";
-    const loaderCode = `getgenv().Key = "${activeKey || "PASTE_KEY_HERE"}"
-getgenv().Webhook = "YOUR_DISCORD_WEBHOOK" -- (Optional)
+    const loaderCode = `getgenv().Webhook = "YOUR_DISCORD_WEBHOOK" -- (Optional)
 loadstring(game:HttpGet("${loaderUrl}"))()`;
 
     // Evaluate Discord Gate for user
@@ -3639,7 +3638,7 @@ function renderPortalHtml(activeKey, remainingTimeStr, loaderCode, hwidParam, di
         }
       } catch (e) {}
       const webhookLine = webhookVal ? ('getgenv().Webhook = "' + webhookVal + '"') : 'getgenv().Webhook = "YOUR_DISCORD_WEBHOOK" -- (Optional)';
-      const code = 'getgenv().Key = "' + activeKey + '"\n' + webhookLine + '\nloadstring(game:HttpGet("' + finalLoaderUrl + '"))()';
+      const code = webhookLine + '\nloadstring(game:HttpGet("' + finalLoaderUrl + '"))()';
       const rawElem = document.getElementById("raw-loader");
       if (rawElem) rawElem.textContent = code;
     }
