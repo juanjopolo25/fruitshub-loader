@@ -649,34 +649,44 @@ backdrop.BackgroundTransparency = 0.55
 backdrop.BorderSizePixel = 0
 backdrop.Parent = gui
 
--- Main Modal Card
+--// Main Modal Card
 local isKeyNeeded = (keyUrl ~= "")
-local cardHeight = isKeyNeeded and 242 or 150
+local cardHeight = isKeyNeeded and 280 or 150
 local card = Instance.new("Frame")
 card.Name = "Card"
 card.AnchorPoint = Vector2.new(0.5, 0.5)
 card.Position = UDim2.new(0.5, 0, 0.5, 0)
-card.Size = UDim2.new(0, 390, 0, cardHeight)
-card.BackgroundColor3 = Color3.fromRGB(15, 18, 26)
+card.Size = UDim2.new(0, 420, 0, cardHeight)
+card.BackgroundColor3 = Color3.fromRGB(11, 14, 20)
 card.BorderSizePixel = 0
 card.ClipsDescendants = true
 card.Parent = gui
 
 local cardCorner = Instance.new("UICorner")
-cardCorner.CornerRadius = UDim.new(0, 9)
+cardCorner.CornerRadius = UDim.new(0, 8)
 cardCorner.Parent = card
 
 local cardStroke = Instance.new("UIStroke")
-cardStroke.Color = Color3.fromRGB(38, 45, 60)
-cardStroke.Thickness = 1.2
+cardStroke.Color = Color3.fromRGB(30, 38, 54)
+cardStroke.Thickness = 1
 cardStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 cardStroke.Parent = card
+
+-- Top Accent Line
+local topBar = Instance.new("Frame")
+topBar.Name = "AccentTop"
+topBar.Size = UDim2.new(1, 0, 0, 2)
+topBar.Position = UDim2.new(0, 0, 0, 0)
+topBar.BackgroundColor3 = Color3.fromRGB(56, 189, 248)
+topBar.BorderSizePixel = 0
+topBar.Parent = card
 
 -- Header Container
 local header = Instance.new("Frame")
 header.Name = "Header"
-header.Size = UDim2.new(1, 0, 0, 42)
-header.BackgroundColor3 = Color3.fromRGB(18, 22, 32)
+header.Size = UDim2.new(1, 0, 0, 40)
+header.Position = UDim2.new(0, 0, 0, 2)
+header.BackgroundTransparency = 1
 header.BorderSizePixel = 0
 header.Parent = card
 
@@ -684,7 +694,7 @@ local headerDivider = Instance.new("Frame")
 headerDivider.Name = "Divider"
 headerDivider.Size = UDim2.new(1, 0, 0, 1)
 headerDivider.Position = UDim2.new(0, 0, 1, -1)
-headerDivider.BackgroundColor3 = Color3.fromRGB(38, 45, 60)
+headerDivider.BackgroundColor3 = Color3.fromRGB(24, 30, 42)
 headerDivider.BorderSizePixel = 0
 headerDivider.Parent = header
 
@@ -717,59 +727,72 @@ end)
 -- FruitsHub Logo
 local logo = Instance.new("ImageLabel")
 logo.Name = "Logo"
-logo.Size = UDim2.fromOffset(22, 22)
-logo.Position = UDim2.new(0, 12, 0.5, -11)
+logo.Size = UDim2.fromOffset(24, 24)
+logo.Position = UDim2.new(0, 14, 0.5, -12)
 logo.BackgroundTransparency = 1
 logo.ScaleType = Enum.ScaleType.Fit
-logo.Image = "rbxthumb://type=Asset&id=94904197752233&w=150&h=150"
 logo.Parent = header
 
-task.spawn(function()
-    local hasFs = (writefile and readfile and isfile) ~= nil
-    local hasGet = typeof(getcustomasset) == "function"
-    local localPath = "FruitsHub/logo.png"
-    if hasFs and hasGet and isfile(localPath) then
-        local ok, uri = pcall(getcustomasset, localPath)
-        if ok and uri and uri ~= "" then logo.Image = uri return end
+local function resolveLogoUri()
+    local hasFs = (isfile and typeof(isfile) == "function")
+    local hasGet = (getcustomasset and typeof(getcustomasset) == "function")
+    local hasSyn = (getsynasset and typeof(getsynasset) == "function")
+    if hasFs and isfile("FruitsHub/logo.png") then
+        if hasGet then
+            local ok, uri = pcall(getcustomasset, "FruitsHub/logo.png")
+            if ok and uri and uri ~= "" then return uri end
+        end
+        if hasSyn then
+            local ok, uri = pcall(getsynasset, "FruitsHub/logo.png")
+            if ok and uri and uri ~= "" then return uri end
+        end
     end
-    local req = (syn and syn.request) or (http and http.request) or http_request or request
-    if req and hasFs and writefile then
-        pcall(function()
-            local res = req({ Url = "https://files.catbox.moe/kgq50j.png", Method = "GET" })
-            if res and (res.StatusCode == 200 or res.status == 200) then
-                local body = res.Body or res.body
-                if body and #body > 100 then
-                    if makefolder and not isfolder("FruitsHub") then makefolder("FruitsHub") end
-                    writefile(localPath, body)
-                    if hasGet then
-                        local ok, uri = pcall(getcustomasset, localPath)
-                        if ok and uri then logo.Image = uri end
+    return nil
+end
+
+local initialUri = resolveLogoUri()
+if initialUri then
+    logo.Image = initialUri
+else
+    task.spawn(function()
+        local req = (syn and syn.request) or (http and http.request) or http_request or request
+        if req and writefile then
+            pcall(function()
+                local res = req({ Url = "https://files.catbox.moe/kgq50j.png", Method = "GET" })
+                if res and (res.StatusCode == 200 or res.status == 200) then
+                    local body = res.Body or res.body
+                    if body and #body > 100 then
+                        if makefolder and not isfolder("FruitsHub") then pcall(makefolder, "FruitsHub") end
+                        pcall(writefile, "FruitsHub/logo.png", body)
+                        local uri = resolveLogoUri()
+                        if uri then logo.Image = uri end
                     end
                 end
-            end
-        end)
-    end
-end)
+            end)
+        end
+    end)
+end
 
 -- Brand Text
 local brand = Instance.new("TextLabel")
 brand.Name = "Brand"
 brand.Text = "FRUITSHUB"
 brand.Font = Enum.Font.GothamBold
-brand.TextSize = 13
+brand.TextSize = 14
 brand.TextColor3 = Color3.fromRGB(56, 189, 248)
 brand.TextXAlignment = Enum.TextXAlignment.Left
 brand.BackgroundTransparency = 1
-brand.Position = UDim2.new(0, 40, 0, 0)
+brand.AutoLocalize = false
+brand.Position = UDim2.new(0, 46, 0, 0)
 brand.Size = UDim2.new(0, 85, 1, 0)
 brand.Parent = header
 
 -- Badge Tag
 local badge = Instance.new("Frame")
 badge.Name = "Badge"
-badge.Size = UDim2.new(0, 84, 0, 18)
-badge.Position = UDim2.new(0, 130, 0.5, -9)
-badge.BackgroundColor3 = Color3.fromRGB(24, 32, 47)
+badge.Size = UDim2.new(0, 92, 0, 20)
+badge.Position = UDim2.new(0, 136, 0.5, -10)
+badge.BackgroundColor3 = Color3.fromRGB(18, 22, 32)
 badge.BorderSizePixel = 0
 badge.Parent = header
 
@@ -777,40 +800,50 @@ local badgeCorner = Instance.new("UICorner")
 badgeCorner.CornerRadius = UDim.new(0, 4)
 badgeCorner.Parent = badge
 
+local badgeStroke = Instance.new("UIStroke")
+badgeStroke.Color = Color3.fromRGB(30, 38, 54)
+badgeStroke.Thickness = 1
+badgeStroke.Parent = badge
+
 local badgeText = Instance.new("TextLabel")
 badgeText.Size = UDim2.new(1, 0, 1, 0)
 badgeText.BackgroundTransparency = 1
-badgeText.Text = (isKeyNeeded and "KEY REQUIRED" or "SYSTEM NOTICE")
+badgeText.Text = (isKeyNeeded and "KEY SYSTEM" or "SYSTEM NOTICE")
 badgeText.Font = Enum.Font.GothamBold
 badgeText.TextSize = 9
 badgeText.TextColor3 = Color3.fromRGB(148, 163, 184)
+badgeText.AutoLocalize = false
 badgeText.Parent = badge
 
 -- Close Button ("✕")
 local closeBtn = Instance.new("TextButton")
 closeBtn.Name = "CloseBtn"
 closeBtn.Size = UDim2.fromOffset(24, 24)
-closeBtn.Position = UDim2.new(1, -34, 0.5, -12)
-closeBtn.BackgroundColor3 = Color3.fromRGB(24, 30, 42)
+closeBtn.Position = UDim2.new(1, -38, 0.5, -12)
+closeBtn.BackgroundColor3 = Color3.fromRGB(18, 22, 32)
 closeBtn.BorderSizePixel = 0
 closeBtn.Text = "✕"
 closeBtn.Font = Enum.Font.GothamBold
 closeBtn.TextSize = 11
 closeBtn.TextColor3 = Color3.fromRGB(148, 163, 184)
 closeBtn.AutoButtonColor = false
+closeBtn.AutoLocalize = false
 closeBtn.Parent = header
 
 local closeCorner = Instance.new("UICorner")
-closeCorner.CornerRadius = UDim.new(0, 5)
+closeCorner.CornerRadius = UDim.new(0, 4)
 closeCorner.Parent = closeBtn
 
+local closeStroke = Instance.new("UIStroke")
+closeStroke.Color = Color3.fromRGB(30, 38, 54)
+closeStroke.Thickness = 1
+closeStroke.Parent = closeBtn
+
 closeBtn.MouseEnter:Connect(function()
-    closeBtn.BackgroundColor3 = Color3.fromRGB(239, 68, 68)
-    closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    TweenService:Create(closeBtn, TweenInfo.new(0.15), { BackgroundColor3 = Color3.fromRGB(239, 68, 68), TextColor3 = Color3.fromRGB(255, 255, 255) }):Play()
 end)
 closeBtn.MouseLeave:Connect(function()
-    closeBtn.BackgroundColor3 = Color3.fromRGB(24, 30, 42)
-    closeBtn.TextColor3 = Color3.fromRGB(148, 163, 184)
+    TweenService:Create(closeBtn, TweenInfo.new(0.15), { BackgroundColor3 = Color3.fromRGB(18, 22, 32), TextColor3 = Color3.fromRGB(148, 163, 184) }):Play()
 end)
 closeBtn.MouseButton1Click:Connect(function()
     gui:Destroy()
@@ -819,39 +852,66 @@ end)
 -- Content Frame
 local content = Instance.new("Frame")
 content.Name = "Content"
-content.Position = UDim2.new(0, 16, 0, 48)
-content.Size = UDim2.new(1, -32, 1, -56)
+content.Position = UDim2.new(0, 14, 0, 48)
+content.Size = UDim2.new(1, -28, 1, -54)
 content.BackgroundTransparency = 1
 content.Parent = card
 
--- Description Message
-local msgLabel = Instance.new("TextLabel")
-msgLabel.Name = "MsgLabel"
-msgLabel.Size = UDim2.new(1, 0, 0, 30)
-msgLabel.Position = UDim2.new(0, 0, 0, 4)
-msgLabel.BackgroundTransparency = 1
-msgLabel.Text = msgText
-msgLabel.Font = Enum.Font.GothamMedium
-msgLabel.TextSize = 11
-msgLabel.TextColor3 = Color3.fromRGB(203, 213, 225)
-msgLabel.TextXAlignment = Enum.TextXAlignment.Left
-msgLabel.TextYAlignment = Enum.TextYAlignment.Top
-msgLabel.TextWrapped = true
-msgLabel.Parent = content
+-- Notice Banner
+local banner = Instance.new("Frame")
+banner.Name = "Banner"
+banner.Size = UDim2.new(1, 0, 0, 34)
+banner.Position = UDim2.new(0, 0, 0, 0)
+banner.BackgroundColor3 = Color3.fromRGB(18, 22, 32)
+banner.BorderSizePixel = 0
+banner.Parent = content
+
+local bCorner = Instance.new("UICorner")
+bCorner.CornerRadius = UDim.new(0, 6)
+bCorner.Parent = banner
+
+local bStroke = Instance.new("UIStroke")
+bStroke.Color = Color3.fromRGB(30, 38, 54)
+bStroke.Thickness = 1
+bStroke.Parent = banner
+
+local bAccent = Instance.new("Frame")
+bAccent.Size = UDim2.new(0, 3, 1, -8)
+bAccent.Position = UDim2.new(0, 6, 0, 4)
+bAccent.BackgroundColor3 = Color3.fromRGB(56, 189, 248)
+bAccent.BorderSizePixel = 0
+bAccent.Parent = banner
+
+local bAccentCorner = Instance.new("UICorner")
+bAccentCorner.CornerRadius = UDim.new(0, 2)
+bAccentCorner.Parent = bAccent
+
+local bText = Instance.new("TextLabel")
+bText.Text = msgText
+bText.Font = Enum.Font.GothamMedium
+bText.TextSize = 10
+bText.TextColor3 = Color3.fromRGB(203, 213, 225)
+bText.TextXAlignment = Enum.TextXAlignment.Left
+bText.BackgroundTransparency = 1
+bText.AutoLocalize = false
+bText.Position = UDim2.new(0, 16, 0, 0)
+bText.Size = UDim2.new(1, -20, 1, 0)
+bText.Parent = banner
 
 if isKeyNeeded then
     -- "Get Key" Button
     local getKeyBtn = Instance.new("TextButton")
     getKeyBtn.Name = "GetKeyBtn"
-    getKeyBtn.Size = UDim2.new(1, 0, 0, 32)
-    getKeyBtn.Position = UDim2.new(0, 0, 0, 38)
-    getKeyBtn.BackgroundColor3 = Color3.fromRGB(24, 30, 42)
+    getKeyBtn.Size = UDim2.new(1, 0, 0, 34)
+    getKeyBtn.Position = UDim2.new(0, 0, 0, 44)
+    getKeyBtn.BackgroundColor3 = Color3.fromRGB(20, 26, 38)
     getKeyBtn.BorderSizePixel = 0
     getKeyBtn.Text = "Get Key"
-    getKeyBtn.Font = Enum.Font.GothamMedium
-    getKeyBtn.TextSize = 11
-    getKeyBtn.TextColor3 = Color3.fromRGB(226, 232, 240)
+    getKeyBtn.Font = Enum.Font.GothamBold
+    getKeyBtn.TextSize = 12
+    getKeyBtn.TextColor3 = Color3.fromRGB(241, 245, 249)
     getKeyBtn.AutoButtonColor = false
+    getKeyBtn.AutoLocalize = false
     getKeyBtn.Parent = content
 
     local getKeyCorner = Instance.new("UICorner")
@@ -859,57 +919,39 @@ if isKeyNeeded then
     getKeyCorner.Parent = getKeyBtn
 
     local getKeyStroke = Instance.new("UIStroke")
-    getKeyStroke.Color = Color3.fromRGB(45, 55, 72)
+    getKeyStroke.Color = Color3.fromRGB(40, 50, 72)
     getKeyStroke.Thickness = 1
     getKeyStroke.Parent = getKeyBtn
 
-    local isCopied = false
-    getKeyBtn.MouseButton1Click:Connect(function()
-        if setclipboard then
-            pcall(function() setclipboard(keyUrl) end)
-        end
-        pcall(function()
-            StarterGui:SetCore("SendNotification", {
-                Title = "FruitsHub",
-                Text = "Key link copied to clipboard!",
-                Duration = 3
-            })
-        end)
-        if not isCopied then
-            isCopied = true
-            getKeyBtn.Text = "Link Copied to Clipboard! ✓"
-            getKeyBtn.TextColor3 = Color3.fromRGB(74, 222, 128)
-            getKeyStroke.Color = Color3.fromRGB(34, 197, 94)
-            task.delay(2.5, function()
-                if getKeyBtn and getKeyBtn.Parent then
-                    getKeyBtn.Text = "Get Key"
-                    getKeyBtn.TextColor3 = Color3.fromRGB(226, 232, 240)
-                    getKeyStroke.Color = Color3.fromRGB(45, 55, 72)
-                    isCopied = false
-                end
-            end)
-        end
+    getKeyBtn.MouseEnter:Connect(function()
+        TweenService:Create(getKeyBtn, TweenInfo.new(0.15), { BackgroundColor3 = Color3.fromRGB(30, 40, 60) }):Play()
+        TweenService:Create(getKeyStroke, TweenInfo.new(0.15), { Color = Color3.fromRGB(56, 189, 248) }):Play()
+    end)
+    getKeyBtn.MouseLeave:Connect(function()
+        TweenService:Create(getKeyBtn, TweenInfo.new(0.15), { BackgroundColor3 = Color3.fromRGB(20, 26, 38) }):Play()
+        TweenService:Create(getKeyStroke, TweenInfo.new(0.15), { Color = Color3.fromRGB(40, 50, 72) }):Play()
     end)
 
     -- Key Input Box
     local keyBox = Instance.new("TextBox")
     keyBox.Name = "KeyBox"
-    keyBox.Size = UDim2.new(1, 0, 0, 34)
-    keyBox.Position = UDim2.new(0, 0, 0, 78)
-    keyBox.BackgroundColor3 = Color3.fromRGB(10, 12, 18)
+    keyBox.Size = UDim2.new(1, 0, 0, 36)
+    keyBox.Position = UDim2.new(0, 0, 0, 88)
+    keyBox.BackgroundColor3 = Color3.fromRGB(14, 17, 24)
     keyBox.BorderSizePixel = 0
     keyBox.PlaceholderText = "Paste your key here (FH-...)"
-    keyBox.PlaceholderColor3 = Color3.fromRGB(100, 116, 139)
+    keyBox.PlaceholderColor3 = Color3.fromRGB(90, 105, 125)
     keyBox.Text = ""
     keyBox.TextColor3 = Color3.fromRGB(241, 245, 249)
     keyBox.Font = Enum.Font.GothamMedium
     keyBox.TextSize = 11
     keyBox.ClearTextOnFocus = false
+    keyBox.AutoLocalize = false
     keyBox.Parent = content
 
     local keyBoxPadding = Instance.new("UIPadding")
-    keyBoxPadding.PaddingLeft = UDim.new(0, 10)
-    keyBoxPadding.PaddingRight = UDim.new(0, 10)
+    keyBoxPadding.PaddingLeft = UDim.new(0, 12)
+    keyBoxPadding.PaddingRight = UDim.new(0, 12)
     keyBoxPadding.Parent = keyBox
 
     local keyBoxCorner = Instance.new("UICorner")
@@ -917,9 +959,16 @@ if isKeyNeeded then
     keyBoxCorner.Parent = keyBox
 
     local keyBoxStroke = Instance.new("UIStroke")
-    keyBoxStroke.Color = Color3.fromRGB(38, 45, 60)
+    keyBoxStroke.Color = Color3.fromRGB(30, 38, 54)
     keyBoxStroke.Thickness = 1
     keyBoxStroke.Parent = keyBox
+
+    keyBox.Focused:Connect(function()
+        TweenService:Create(keyBoxStroke, TweenInfo.new(0.15), { Color = Color3.fromRGB(56, 189, 248) }):Play()
+    end)
+    keyBox.FocusLost:Connect(function()
+        TweenService:Create(keyBoxStroke, TweenInfo.new(0.15), { Color = Color3.fromRGB(30, 38, 54) }):Play()
+    end)
 
     -- Pre-fill if saved locally
     pcall(function()
@@ -932,15 +981,57 @@ if isKeyNeeded then
     -- Status Feedback Label
     local statusLbl = Instance.new("TextLabel")
     statusLbl.Name = "StatusLbl"
-    statusLbl.Size = UDim2.new(1, 0, 0, 16)
-    statusLbl.Position = UDim2.new(0, 0, 0, 116)
+    statusLbl.Size = UDim2.new(1, 0, 0, 18)
+    statusLbl.Position = UDim2.new(0, 0, 0, 178)
     statusLbl.BackgroundTransparency = 1
-    statusLbl.Text = ""
-    statusLbl.Font = Enum.Font.Gotham
+    statusLbl.Text = "Click 'Get Key' to copy the checkpoint link to your clipboard."
+    statusLbl.Font = Enum.Font.GothamMedium
     statusLbl.TextSize = 10
-    statusLbl.TextColor3 = Color3.fromRGB(248, 113, 113)
-    statusLbl.TextXAlignment = Enum.TextXAlignment.Left
+    statusLbl.TextColor3 = Color3.fromRGB(148, 163, 184)
+    statusLbl.TextXAlignment = Enum.TextXAlignment.Center
+    statusLbl.TextTruncate = Enum.TextTruncate.AtEnd
+    statusLbl.AutoLocalize = false
     statusLbl.Parent = content
+
+    local isCopied = false
+    getKeyBtn.MouseButton1Click:Connect(function()
+        local copied = false
+        if setclipboard then
+            pcall(function() setclipboard(keyUrl) end)
+            copied = true
+        elseif toclipboard then
+            pcall(function() toclipboard(keyUrl) end)
+            copied = true
+        end
+        pcall(function()
+            StarterGui:SetCore("SendNotification", {
+                Title = "FruitsHub",
+                Text = "Key link copied to clipboard!",
+                Duration = 3
+            })
+        end)
+        if copied then
+            statusLbl.Text = "✓ Gateway link copied to clipboard! Paste it in your browser."
+            statusLbl.TextColor3 = Color3.fromRGB(34, 197, 94)
+        else
+            statusLbl.Text = "Gateway link: " .. keyUrl
+            statusLbl.TextColor3 = Color3.fromRGB(56, 189, 248)
+        end
+        if not isCopied then
+            isCopied = true
+            getKeyBtn.Text = "Link Copied to Clipboard! ✓"
+            getKeyBtn.TextColor3 = Color3.fromRGB(74, 222, 128)
+            getKeyStroke.Color = Color3.fromRGB(34, 197, 94)
+            task.delay(2.5, function()
+                if getKeyBtn and getKeyBtn.Parent then
+                    getKeyBtn.Text = "Get Key"
+                    getKeyBtn.TextColor3 = Color3.fromRGB(241, 245, 249)
+                    getKeyStroke.Color = Color3.fromRGB(40, 50, 72)
+                    isCopied = false
+                end
+            end)
+        end
+    end)
 
     -- Auto-detect key from clipboard if starts with FH-
     pcall(function()
@@ -958,7 +1049,7 @@ if isKeyNeeded then
     local submitBtn = Instance.new("TextButton")
     submitBtn.Name = "SubmitBtn"
     submitBtn.Size = UDim2.new(1, 0, 0, 36)
-    submitBtn.Position = UDim2.new(0, 0, 0, 136)
+    submitBtn.Position = UDim2.new(0, 0, 0, 134)
     submitBtn.BackgroundColor3 = Color3.fromRGB(56, 189, 248)
     submitBtn.BorderSizePixel = 0
     submitBtn.Text = "Verify & Launch FruitsHub"
@@ -966,6 +1057,7 @@ if isKeyNeeded then
     submitBtn.TextSize = 12
     submitBtn.TextColor3 = Color3.fromRGB(11, 14, 20)
     submitBtn.AutoButtonColor = false
+    submitBtn.AutoLocalize = false
     submitBtn.Parent = content
 
     local submitCorner = Instance.new("UICorner")
