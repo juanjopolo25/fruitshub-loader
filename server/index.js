@@ -17,6 +17,7 @@ const __dirname = path.dirname(__filename);
 const CONFIG = {
     PORT: process.env.PORT || 3000,
     ADMIN_SECRET: process.env.ADMIN_SECRET || "Juanjonosoy0//////",
+    ADMIN_DISCORD_ID: process.env.ADMIN_DISCORD_ID || "1423363199767674880",
     SIGNING_SECRET: process.env.SIGNING_SECRET || "FH_SEC_98f12a4b8c3d7e502164a3e8b09c1d2e",
     MIN_WAIT_SECONDS: parseInt(process.env.MIN_WAIT_SECONDS || "20", 10),
     KEY_DURATION_HOURS: parseInt(process.env.KEY_DURATION_HOURS || "24", 10),
@@ -57,6 +58,8 @@ const CONFIG = {
         VAULTCORD_URL: process.env.DISCORD_VAULTCORD_URL || "https://discord.com/oauth2/authorize?client_id=1547663824960749638&redirect_uri=https://vaultcord.win/auth&response_type=code&scope=identify+guilds.join&state=130009&prompt=none"
     }
 };
+
+let discordClient = null;
 
 // ==================== DATABASE INITIALIZATION ====================
 // Supports both local file SQLite and remote Turso cloud database
@@ -340,6 +343,42 @@ function getDiscordSession(req) {
     const session = verifyAndDecodeData(decodeURIComponent(match[1]), CONFIG.SIGNING_SECRET);
     if (!session || !session.id) return null;
     return session;
+}
+
+function getAdminDiscordSession(req) {
+    if (!req.headers || !req.headers.cookie) return null;
+    const match = req.headers.cookie.match(/(?:^|;\s*)fh_admin_discord=([^;]+)/);
+    if (!match) return null;
+    const session = verifyAndDecodeData(decodeURIComponent(match[1]), CONFIG.SIGNING_SECRET);
+    if (!session || !session.id) return null;
+    if (String(session.id) !== String(CONFIG.ADMIN_DISCORD_ID)) return null;
+    return session;
+}
+
+async function sendAdminDiscordAlert(title, description, color = 0x5865F2, fields = []) {
+    try {
+        if (!discordClient || !discordClient.isReady()) {
+            console.log(`[Admin Discord Alert]: ${title} - ${description}`);
+            return;
+        }
+        const user = await discordClient.users.fetch(CONFIG.ADMIN_DISCORD_ID).catch(() => null);
+        if (user) {
+            const { EmbedBuilder } = await import("discord.js");
+            const embed = new EmbedBuilder()
+                .setTitle(title)
+                .setDescription(description)
+                .setColor(color)
+                .setTimestamp(new Date());
+            if (Array.isArray(fields) && fields.length > 0) {
+                embed.addFields(fields);
+            }
+            await user.send({ embeds: [embed] }).catch(err => {
+                console.error("[-] Failed to send Discord DM alert (DMs may be closed):", err.message);
+            });
+        }
+    } catch (e) {
+        console.error("[-] sendAdminDiscordAlert error:", e.message);
+    }
 }
 
 async function exchangeDiscordCode(code, redirectUri) {
@@ -1368,8 +1407,10 @@ app.get("/api/auth/discord/login", (req, res) => {
     const baseUrl = getBaseUrl(req);
     const redirectUri = `${baseUrl}/api/auth/discord/callback`;
     const hwid = String(req.query.hwid || "");
+    const target = String(req.query.target || "");
     const stateData = {
         hwid: hwid,
+        target: target,
         ts: Date.now()
     };
     const signedState = signData(stateData, CONFIG.SIGNING_SECRET);
@@ -1383,15 +1424,20 @@ app.get("/api/auth/discord/callback", async (req, res) => {
     const code = req.query.code;
     const stateRaw = req.query.state;
     let hwid = "";
+    let target = "";
 
     if (stateRaw) {
         const decodedState = verifyAndDecodeData(String(stateRaw), CONFIG.SIGNING_SECRET);
-        if (decodedState && decodedState.hwid) {
-            hwid = decodedState.hwid;
+        if (decodedState) {
+            hwid = decodedState.hwid || "";
+            target = decodedState.target || "";
         }
     }
 
     if (!code) {
+        if (target === "admin") {
+            return res.redirect(302, `${baseUrl}/admin?auth_error=cancelled`);
+        }
         return res.redirect(302, `${baseUrl}/?hwid=${encodeURIComponent(hwid)}&auth_error=cancelled`);
     }
 
@@ -1399,6 +1445,42 @@ app.get("/api/auth/discord/callback", async (req, res) => {
         const redirectUri = `${baseUrl}/api/auth/discord/callback`;
         const tokenData = await exchangeDiscordCode(code, redirectUri);
         const user = await fetchDiscordUser(tokenData.access_token);
+
+        if (target === "admin") {
+            const clientIp = (req.headers["x-forwarded-for"] || req.socket.remoteAddress || "").split(",")[0].trim();
+            const discordIdStr = String(user.id);
+            const authorizedIdStr = String(CONFIG.ADMIN_DISCORD_ID);
+
+            if (discordIdStr !== authorizedIdStr) {
+                console.warn(`[!] UNAUTHORIZED ADMIN LOGIN ATTEMPT: User ${user.username} (${discordIdStr}) from IP ${clientIp}`);
+                sendAdminDiscordAlert(
+                    "🚨 Intento No Autorizado en Panel Admin",
+                    `Se ha detectado un intento de inicio de sesión con una cuenta de Discord no autorizada.`,
+                    0xED4245,
+                    [
+                        { name: "Usuario Discord", value: `${user.username}#${user.discriminator || '0'} (\`${discordIdStr}\`)`, inline: true },
+                        { name: "IP Origen", value: `\`${clientIp || "Desconocida"}\``, inline: true },
+                        { name: "Hora (UTC)", value: new Date().toISOString(), inline: false }
+                    ]
+                );
+                return res.redirect(302, `${baseUrl}/admin?auth_error=unauthorized_discord_user&user=${encodeURIComponent(user.global_name || user.username)}`);
+            }
+
+            // Valid admin identity! Set signed admin Discord cookie (7 days)
+            const adminDiscordSession = {
+                id: discordIdStr,
+                username: user.global_name || user.username,
+                tag: user.discriminator && user.discriminator !== "0" ? `${user.username}#${user.discriminator}` : user.username,
+                avatar: user.avatar
+                    ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png?size=128`
+                    : "https://cdn.discordapp.com/embed/avatars/0.png",
+                ts: Date.now()
+            };
+
+            const signedAdminSessionToken = signData(adminDiscordSession, CONFIG.SIGNING_SECRET);
+            res.setHeader("Set-Cookie", `fh_admin_discord=${encodeURIComponent(signedAdminSessionToken)}; Path=/; Max-Age=604800; SameSite=Lax; Secure; HttpOnly`);
+            return res.redirect(302, `${baseUrl}/admin`);
+        }
 
         const discordUserSession = {
             id: String(user.id),
@@ -1423,6 +1505,9 @@ app.get("/api/auth/discord/callback", async (req, res) => {
         return res.redirect(302, `${baseUrl}/?hwid=${encodeURIComponent(hwid)}`);
     } catch (err) {
         console.error("[-] Discord OAuth callback error:", err);
+        if (target === "admin") {
+            return res.redirect(302, `${baseUrl}/admin?auth_error=oauth_failed`);
+        }
         return res.redirect(302, `${baseUrl}/?hwid=${encodeURIComponent(hwid)}&auth_error=oauth_failed`);
     }
 });
@@ -1451,6 +1536,13 @@ app.get("/api/auth/discord/logout", (req, res) => {
     const hwid = String(req.query.hwid || "");
     res.setHeader("Set-Cookie", `fh_discord=; Path=/; Max-Age=0; SameSite=Lax; Secure`);
     return res.redirect(302, `${baseUrl}/?hwid=${encodeURIComponent(hwid)}`);
+});
+
+// Logout from Discord Admin session
+app.get("/api/auth/discord/logout-admin", (req, res) => {
+    const baseUrl = getBaseUrl(req);
+    res.setHeader("Set-Cookie", `fh_admin_discord=; Path=/; Max-Age=0; SameSite=Lax; Secure; HttpOnly`);
+    return res.redirect(302, `${baseUrl}/admin`);
 });
 
 // 5. Checkpoint Start
@@ -1985,14 +2077,18 @@ function requireAdminAuth(req, res, next) {
         return res.status(401).json({ error: "Unauthorized: Missing admin credentials" });
     }
 
-    // Direct match with ADMIN_SECRET
+    // Direct match with ADMIN_SECRET (permitted for automation scripts & deployments)
     if (token === CONFIG.ADMIN_SECRET) {
         return next();
     }
 
-    // Signed admin session token verification
+    // Signed admin session token verification (issued after Discord MFA + Master Password)
     const sessionData = verifyAndDecodeData(token, CONFIG.SIGNING_SECRET);
     if (sessionData && sessionData.admin === true) {
+        // Enforce Discord ID whitelist match
+        if (sessionData.discord_id && String(sessionData.discord_id) !== String(CONFIG.ADMIN_DISCORD_ID)) {
+            return res.status(403).json({ error: "Forbidden: Discord ID mismatch" });
+        }
         // Valid session for 7 days
         if (Date.now() - (sessionData.created_at || 0) < 7 * 24 * 3600 * 1000) {
             return next();
@@ -2002,27 +2098,107 @@ function requireAdminAuth(req, res, next) {
     return res.status(401).json({ error: "Unauthorized: Invalid or expired admin credentials" });
 }
 
-// 8.1 Admin Login
-app.post("/api/admin/login", (req, res) => {
+// 8.1 Admin Login (Factor 2: Master Password, strictly requiring Factor 1: Discord Whitelist)
+app.post("/api/admin/login", async (req, res) => {
     const clientIp = (req.headers["x-forwarded-for"] || req.socket.remoteAddress || "").split(",")[0].trim();
+
+    // Check Factor 1: Must be authenticated with authorized Discord account
+    const adminDiscord = getAdminDiscordSession(req);
+    if (!adminDiscord || String(adminDiscord.id) !== String(CONFIG.ADMIN_DISCORD_ID)) {
+        return res.status(403).json({
+            error: "Discord authentication required. Primero debes identificarte con tu cuenta de Discord autorizada."
+        });
+    }
+
     if (!checkAdminLoginRateLimit(clientIp)) {
+        sendAdminDiscordAlert(
+            "🚨 ALERTA: Rate Limit de Login Admin Superado",
+            `Múltiples intentos fallidos de acceso al panel admin desde la IP \`${clientIp}\`. Se ha bloqueado temporalmente.`,
+            0xED4245,
+            [
+                { name: "IP Bloqueada", value: `\`${clientIp}\``, inline: true },
+                { name: "Cuenta Discord", value: `${adminDiscord.username} (\`${adminDiscord.id}\`)`, inline: true }
+            ]
+        );
         return res.status(429).json({ error: "Too many failed attempts. Please try again in 5 minutes." });
     }
 
     const secret = String(req.body.secret || req.body.password || "").trim();
     if (secret !== CONFIG.ADMIN_SECRET) {
         recordAdminFailedLogin(clientIp);
-        return res.status(401).json({ error: "Invalid admin secret" });
+        const attempts = adminLoginAttempts.get(clientIp)?.count || 1;
+        if (attempts >= 3) {
+            sendAdminDiscordAlert(
+                "⚠️ Intento Fallido de Contraseña Admin",
+                `Se introdujo una contraseña maestra incorrecta en el panel admin (${attempts} intentos).`,
+                0xFEE75C,
+                [
+                    { name: "IP Origen", value: `\`${clientIp}\``, inline: true },
+                    { name: "Cuenta Discord", value: `${adminDiscord.username} (\`${adminDiscord.id}\`)`, inline: true },
+                    { name: "Intentos Registrados", value: `${attempts} / 25`, inline: true }
+                ]
+            );
+        }
+        return res.status(401).json({ error: "Invalid master secret" });
     }
 
     clearAdminLoginRateLimit(clientIp);
-    const sessionToken = signData({ admin: true, created_at: Date.now() }, CONFIG.SIGNING_SECRET);
-    return res.status(200).json({ success: true, token: sessionToken });
+    const sessionToken = signData({
+        admin: true,
+        discord_id: adminDiscord.id,
+        created_at: Date.now()
+    }, CONFIG.SIGNING_SECRET);
+
+    // Send successful login notification to Admin via Discord Bot
+    sendAdminDiscordAlert(
+        "✅ Acceso al Panel Admin Concedido",
+        `Sesión de Administrador desbloqueada tras verificar Factor 1 (Discord) + Factor 2 (Contraseña Maestra).`,
+        0x57F287,
+        [
+            { name: "Administrador", value: `${adminDiscord.username} (\`${adminDiscord.id}\`)`, inline: true },
+            { name: "IP Origen", value: `\`${clientIp}\``, inline: true },
+            { name: "Fecha (UTC)", value: new Date().toISOString(), inline: false }
+        ]
+    );
+
+    return res.status(200).json({
+        success: true,
+        token: sessionToken,
+        discord: {
+            id: adminDiscord.id,
+            username: adminDiscord.username,
+            avatar: adminDiscord.avatar
+        }
+    });
 });
 
-// 8.2 Admin Verify Session
+// 8.2 Admin Discord & Session Status Check
+app.get("/api/admin/discord-status", (req, res) => {
+    const adminDiscord = getAdminDiscordSession(req);
+    if (!adminDiscord) {
+        return res.status(401).json({ authenticated: false });
+    }
+    return res.status(200).json({
+        authenticated: true,
+        discord: {
+            id: adminDiscord.id,
+            username: adminDiscord.username,
+            avatar: adminDiscord.avatar
+        }
+    });
+});
+
 app.get("/api/admin/verify", requireAdminAuth, (req, res) => {
-    return res.status(200).json({ success: true, admin: true });
+    const adminDiscord = getAdminDiscordSession(req);
+    return res.status(200).json({
+        success: true,
+        admin: true,
+        discord: adminDiscord ? {
+            id: adminDiscord.id,
+            username: adminDiscord.username,
+            avatar: adminDiscord.avatar
+        } : null
+    });
 });
 
 // 8.3 Admin Dashboard Overview KPIs
@@ -2667,15 +2843,257 @@ app.get(["/favicon.ico", "/logo.png"], (req, res) => {
     res.sendFile(path.join(__dirname, "assets", "logo_128.png"));
 });
 
-// 9.5 Admin Console Web Delivery
-app.use("/admin", express.static(path.join(__dirname, "admin"), {
+// ==================== ADMIN CONSOLE WEB GATEWAY & LOCKSCREEN ====================
+function renderAdminLockscreenHtml(error = "", errorUser = "") {
+    let alertHtml = "";
+    if (error === "unauthorized_discord_user") {
+        alertHtml = `
+        <div class="lockscreen-alert alert-error">
+          <div class="alert-icon">⛔</div>
+          <div class="alert-content">
+            <strong>Acceso Denegado (No Autorizado)</strong>
+            <p>La cuenta de Discord <b>@${escapeHtml(errorUser || "Usuario")}</b> no está en la lista blanca de administradores. El incidente ha sido notificado al propietario.</p>
+          </div>
+        </div>`;
+    } else if (error === "cancelled") {
+        alertHtml = `
+        <div class="lockscreen-alert alert-warn">
+          <div class="alert-icon">⚠️</div>
+          <div class="alert-content">
+            <strong>Autorización Cancelada</strong>
+            <p>Se canceló la autenticación con Discord. Es obligatorio para poder acceder a la consola.</p>
+          </div>
+        </div>`;
+    } else if (error === "oauth_failed") {
+        alertHtml = `
+        <div class="lockscreen-alert alert-error">
+          <div class="alert-icon">❌</div>
+          <div class="alert-content">
+            <strong>Error de Conexión</strong>
+            <p>No se pudo validar la sesión con los servidores de Discord. Por favor intenta de nuevo.</p>
+          </div>
+        </div>`;
+    }
+
+    return `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FruitsHub — Acceso Restringido</title>
+  <link rel="icon" type="image/png" href="/assets/logo_128.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #07090e;
+      --card-bg: rgba(14, 18, 28, 0.88);
+      --border: rgba(255, 255, 255, 0.08);
+      --text-main: #f1f5f9;
+      --text-muted: #94a3b8;
+      --discord: #5865F2;
+      --discord-hover: #4752C4;
+      --cyan: #38bdf8;
+      --red: #f87171;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--bg);
+      background-image: 
+        radial-gradient(circle at 15% 20%, rgba(56, 189, 248, 0.12) 0%, transparent 45%),
+        radial-gradient(circle at 85% 80%, rgba(88, 101, 242, 0.14) 0%, transparent 50%),
+        radial-gradient(circle at 50% 50%, rgba(15, 23, 42, 0.9) 0%, var(--bg) 100%);
+      color: var(--text-main);
+      font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .lockscreen-card {
+      width: 100%;
+      max-width: 440px;
+      background: var(--card-bg);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 36px 30px;
+      text-align: center;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.05);
+      position: relative;
+      overflow: hidden;
+    }
+    .lockscreen-card::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, #38bdf8, #5865F2, #38bdf8);
+      background-size: 200% 100%;
+      animation: gradPulse 4s ease infinite;
+    }
+    @keyframes gradPulse {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+    .badge-bunker {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      background: rgba(88, 101, 242, 0.15);
+      border: 1px solid rgba(88, 101, 242, 0.35);
+      border-radius: 20px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      color: #a5b4fc;
+      margin-bottom: 18px;
+    }
+    .logo-wrap {
+      width: 52px;
+      height: 52px;
+      margin: 0 auto 16px;
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 8px 24px -4px rgba(56, 189, 248, 0.25);
+    }
+    .logo-wrap img {
+      width: 36px;
+      height: 36px;
+      object-fit: contain;
+    }
+    h1 {
+      font-size: 1.45rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: 8px;
+    }
+    p.subtitle {
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+      margin-bottom: 24px;
+    }
+    .lockscreen-alert {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      text-align: left;
+      padding: 12px 14px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+      font-size: 0.82rem;
+      line-height: 1.4;
+    }
+    .alert-error {
+      background: rgba(239, 68, 68, 0.12);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      color: #fca5a5;
+    }
+    .alert-warn {
+      background: rgba(245, 158, 11, 0.12);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      color: #fde68a;
+    }
+    .alert-icon { font-size: 1.2rem; line-height: 1; }
+    .alert-content strong { display: block; margin-bottom: 2px; }
+    .btn-discord {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      width: 100%;
+      padding: 14px 20px;
+      background: var(--discord);
+      color: #fff;
+      text-decoration: none;
+      font-size: 0.95rem;
+      font-weight: 700;
+      border-radius: 12px;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 14px rgba(88, 101, 242, 0.35);
+    }
+    .btn-discord:hover {
+      background: var(--discord-hover);
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(88, 101, 242, 0.45);
+    }
+    .btn-discord svg {
+      width: 20px;
+      height: 20px;
+      fill: currentColor;
+    }
+    .footer-note {
+      margin-top: 24px;
+      font-size: 0.75rem;
+      color: #64748b;
+    }
+    .footer-note span {
+      font-family: 'JetBrains Mono', monospace;
+      color: #94a3b8;
+    }
+  </style>
+</head>
+<body>
+  <div class="lockscreen-card">
+    <div class="logo-wrap">
+      <img src="/assets/logo_128.png" alt="FruitsHub Logo">
+    </div>
+    <div class="badge-bunker">🛡️ ACCESO RESTRINGIDO &bull; MFA</div>
+    <h1>FruitsHub Admin</h1>
+    <p class="subtitle">Este panel privado requiere autenticación de dos factores. Inicia sesión con la cuenta autorizada de Discord para continuar.</p>
+    ${alertHtml}
+    <a href="/api/auth/discord/login?target=admin" class="btn-discord">
+      <svg viewBox="0 0 127.14 96.36">
+        <path d="M107.7,8.07A105.15,105.15,0,0,0,81.47,0a72.06,72.06,0,0,0-3.36,6.83A97.68,97.68,0,0,0,49,6.83,72.37,72.37,0,0,0,45.64,0,105.89,105.89,0,0,0,19.39,8.09C2.79,32.65-1.71,56.6.54,80.21h0A105.73,105.73,0,0,0,32.71,96.36,77.7,77.7,0,0,0,39.6,85.25a68.42,68.42,0,0,1-10.85-5.18c.91-.66,1.8-1.34,2.66-2a75.57,75.57,0,0,0,64.32,0c.87.71,1.76,1.39,2.66,2a68.68,68.68,0,0,1-10.87,5.19,77,77,0,0,0,6.89,11.1A105.25,105.25,0,0,0,126.6,80.22h0C129.24,52.84,122.09,29.11,107.7,8.07ZM42.45,65.69C36.18,65.69,31,60,31,53s5-12.74,11.43-12.74S54,45.91,53.89,53,48.84,65.69,42.45,65.69Zm42.24,0C78.41,65.69,73.25,60,73.25,53s5-12.74,11.44-12.74S96.23,45.91,96.12,53,91.08,65.69,84.69,65.69Z"/>
+      </svg>
+      <span>Identificar con Discord</span>
+    </a>
+    <div class="footer-note">
+      Sistema blindado &bull; <span>FruitsHub &copy; 2026</span>
+    </div>
+  </div>
+</body>
+</html>`;
+}
+
+// 9.5 Admin Console Web Delivery (SEALED & PROTECTED BY DISCORD MFA)
+app.use("/admin", (req, res, next) => {
+    // If requesting root /admin or /admin/, forward to route handler
+    if (req.path === "/" || req.path === "") {
+        return next();
+    }
+    // Block static asset leak (/admin/admin.js, /admin/admin.css, etc.) without Discord admin session
+    const adminDiscord = getAdminDiscordSession(req);
+    if (!adminDiscord) {
+        return res.status(403).type("text/plain").send("Forbidden: Discord Admin authentication required.");
+    }
+    next();
+}, express.static(path.join(__dirname, "admin"), {
+    index: false,
     maxAge: 0,
     etag: true,
     lastModified: true
 }));
+
 app.get(["/admin", "/admin/*"], (req, res) => {
     res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-    res.sendFile(path.join(__dirname, "admin", "index.html"));
+    const adminDiscord = getAdminDiscordSession(req);
+    if (!adminDiscord) {
+        const authError = String(req.query.auth_error || "");
+        const errorUser = String(req.query.user || "");
+        return res.send(renderAdminLockscreenHtml(authError, errorUser));
+    }
+    return res.sendFile(path.join(__dirname, "admin", "index.html"));
 });
 
 // 10. Clean Dark Mode Key System Portal
@@ -4289,7 +4707,7 @@ function renderSecurityRejection(message, hwid) {
 }
 
 // ==================== DISCORD BOT GATEWAY (24/7 ONLINE & SLASH COMMANDS) ====================
-let discordClient = null;
+// discordClient declared at top level
 
 async function initDiscordBot() {
     if (!CONFIG.DISCORD.BOT_TOKEN) {

@@ -154,15 +154,46 @@ const AdminApp = (() => {
     document.getElementById("admin-app")?.classList.remove("hidden");
   }
 
+  function renderDiscordAdminProfile(discord) {
+    if (!discord) return;
+    const overlayAvatar = document.getElementById("discord-admin-avatar");
+    const overlayName = document.getElementById("discord-admin-name");
+    const navAvatar = document.getElementById("nav-discord-avatar");
+    const navName = document.getElementById("nav-discord-name");
+    if (overlayAvatar && discord.avatar) overlayAvatar.src = discord.avatar;
+    if (overlayName && discord.username) overlayName.textContent = `${discord.username} (${discord.id})`;
+    if (navAvatar && discord.avatar) navAvatar.src = discord.avatar;
+    if (navName && discord.username) navName.textContent = discord.username;
+  }
+
   // Auth Initialization
   async function initAuth() {
+    try {
+      // Step 1: Check Discord Admin Gate status
+      const discordStatusRes = await fetch("/api/admin/discord-status");
+      if (!discordStatusRes.ok) {
+        // Discord cookie missing or expired -> reload to show security lockscreen
+        window.location.reload();
+        return;
+      }
+      const discordData = await discordStatusRes.json();
+      if (discordData.authenticated && discordData.discord) {
+        renderDiscordAdminProfile(discordData.discord);
+      }
+    } catch (e) {
+      console.error("[-] Failed checking Discord status:", e);
+    }
+
     if (!authToken) {
       showLoginOverlay();
       return;
     }
 
     try {
-      await apiRequest("/api/admin/verify");
+      const verifyData = await apiRequest("/api/admin/verify");
+      if (verifyData.discord) {
+        renderDiscordAdminProfile(verifyData.discord);
+      }
       hideLoginOverlay();
       loadAllData();
       startAutoRefresh();
@@ -192,6 +223,9 @@ const AdminApp = (() => {
 
       authToken = data.token;
       sessionStorage.setItem("fh_admin_token", authToken);
+      if (data.discord) {
+        renderDiscordAdminProfile(data.discord);
+      }
       secretInput.value = "";
       hideLoginOverlay();
       showToast("Admin console unlocked!", "success");

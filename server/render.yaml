@@ -21,3 +21,6 @@ services:
         value: libsql://fruitshub-juanjopolo25.aws-ap-northeast-1.turso.io
       - key: TURSO_AUTH_TOKEN
         value: eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3ODg5NTUxNzIsImlkIjoiMDFhMDg2MDktNDIwMS03YzNjLThiOGYtY2E0NWEyMDY2MWNmIiwia2lkIjoiM2J4RFc3R0lCS0dhWDFWV3h3YWFmQ1AxMm1aaXd6dXVmOUY5WW9iTjVLayIsInJpZCI6ImQwMjg3M2NhLWU3MTUtNDI4MS04NDk0LWQ1ODcxNTc1MmFkNCJ9.0DGWilrthpwMxAAHvghYLwyqsjF8VXsUKYuKV6m7PiLwOmJqljLKFbL-ErgrfWJJwv3TUq5rv-hiSjzg2zdtCA
+      - key: ADMIN_DISCORD_ID
+        value: "1423363199767674880"
+

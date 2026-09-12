@@ -24,13 +24,27 @@
       <div style="text-align: center; margin-bottom: 12px;">
         <img src="/assets/logo_128.png" alt="FruitsHub Logo" style="width: 44px; height: 44px; object-fit: contain; filter: drop-shadow(0 0 10px rgba(56, 189, 248, 0.5));">
       </div>
-      <div class="login-badge">RESTRICTED ACCESS</div>
+      <div class="login-badge">MFA FACTOR 2 &bull; AUTENTICACIÓN MAESTRA</div>
       <h1 class="login-title">FruitsHub Admin</h1>
-      <p class="login-subtitle">Enter your master secret key to unlock the administration console.</p>
+
+      <!-- Verified Discord Account Card (Factor 1) -->
+      <div id="discord-admin-card" class="discord-admin-card">
+        <div class="discord-admin-avatar-wrap">
+          <img id="discord-admin-avatar" src="https://cdn.discordapp.com/embed/avatars/0.png" alt="Discord Avatar">
+          <span class="discord-check-badge">✓</span>
+        </div>
+        <div class="discord-admin-info">
+          <div class="discord-admin-label">FACTOR 1: DISCORD VERIFICADO</div>
+          <div class="discord-admin-user" id="discord-admin-name">Admin (1423363199767674880)</div>
+        </div>
+        <a href="/api/auth/discord/logout-admin" class="discord-admin-logout" title="Cambiar o cerrar sesión de Discord" aria-label="Cerrar sesión de Discord">&times;</a>
+      </div>
+
+      <p class="login-subtitle">Introduce tu contraseña maestra para desbloquear la consola de administración.</p>
       
       <form id="form-login" class="login-form" novalidate autocomplete="off">
         <div class="form-group">
-          <label for="input-admin-secret" class="form-label">ADMIN SECRET</label>
+          <label for="input-admin-secret" class="form-label">ADMIN SECRET (CONTRASEÑA)</label>
           <div class="password-wrap">
             <input 
               type="password" 
@@ -76,6 +90,12 @@
             <span id="server-status-text">Connected</span>
           </div>
 
+          <!-- Discord Admin Profile Pill -->
+          <div class="user-pill-admin" id="nav-discord-user" title="Admin Discord Autenticado">
+            <img id="nav-discord-avatar" src="https://cdn.discordapp.com/embed/avatars/0.png" alt="Admin Avatar">
+            <span id="nav-discord-name">Admin</span>
+          </div>
+
           <!-- Global Maintenance Switch -->
           <div class="maintenance-toggle-wrap" title="Enable/Disable Roblox maintenance mode">
             <span class="maint-label">Maintenance:</span>
@@ -91,7 +111,7 @@
           </button>
 
           <!-- Logout Button -->
-          <button id="btn-logout" class="btn btn-danger-ghost btn-sm">
+          <button id="btn-logout" class="btn btn-danger-ghost btn-sm" title="Cerrar sesión de administrador">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
             <span>Sign Out</span>
           </button>
