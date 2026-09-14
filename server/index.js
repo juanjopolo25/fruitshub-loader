@@ -54,6 +54,7 @@ const CONFIG = {
         GUILD_ID: process.env.DISCORD_GUILD_ID || "1547661185351024701",
         REQUIRED_ROLE_ID: process.env.DISCORD_REQUIRED_ROLE_ID || "1547661710436073582",
         GRANTED_ROLE_ID: process.env.DISCORD_GRANTED_ROLE_ID || "1547673995799961701",
+        FINDS_CHANNEL_ID: process.env.DISCORD_FINDS_CHANNEL_ID || "1548357759202885775",
         INVITE_URL: process.env.DISCORD_INVITE_URL || "https://discord.gg/sM48AW4gn2",
         VAULTCORD_URL: process.env.DISCORD_VAULTCORD_URL || "https://discord.com/oauth2/authorize?client_id=1547663824960749638&redirect_uri=https://vaultcord.win/auth&response_type=code&scope=identify+guilds.join&state=130009&prompt=none"
     }
@@ -2760,6 +2761,8 @@ async function validateUserKey(keyStr) {
                 key: cleanKey,
                 tier: keyRow.tier || "24h",
                 expires_at: keyRow.expires_at,
+                discord_id: keyRow.discord_id || null,
+                discord_tag: keyRow.discord_tag || null,
                 valid: true
             };
         }
@@ -2945,6 +2948,204 @@ app.delete("/api/user/telemetry", async (req, res) => {
 app.use("/assets", express.static(path.join(__dirname, "assets"), { maxAge: "7d" }));
 app.get(["/favicon.ico", "/logo.png"], (req, res) => {
     res.sendFile(path.join(__dirname, "assets", "logo_128.png"));
+});
+
+// ==================== FRUITS FINDS DISCORD NOTIFIER (OPTION 2) ====================
+const FRUIT_COLORS = {
+    Mythical: 0xFF2D55,
+    Legendary: 0xEAB308,
+    Rare: 0x3B82F6,
+    Uncommon: 0x10B981,
+    Common: 0x6B7280
+};
+
+const FRUIT_CATALOG = {
+    "rocket": { name: "Rocket Fruit", rarity: "Common" },
+    "spin": { name: "Spin Fruit", rarity: "Common" },
+    "blade": { name: "Blade Fruit", rarity: "Common" },
+    "chop": { name: "Chop Fruit", rarity: "Common" },
+    "spring": { name: "Spring Fruit", rarity: "Common" },
+    "bomb": { name: "Bomb Fruit", rarity: "Common" },
+    "smoke": { name: "Smoke Fruit", rarity: "Common" },
+    "spike": { name: "Spike Fruit", rarity: "Common" },
+    "flame": { name: "Flame Fruit", rarity: "Uncommon" },
+    "falcon": { name: "Falcon Fruit", rarity: "Uncommon" },
+    "eagle": { name: "Eagle Fruit", rarity: "Uncommon" },
+    "ice": { name: "Ice Fruit", rarity: "Uncommon" },
+    "sand": { name: "Sand Fruit", rarity: "Uncommon" },
+    "dark": { name: "Dark Fruit", rarity: "Uncommon" },
+    "diamond": { name: "Diamond Fruit", rarity: "Uncommon" },
+    "light": { name: "Light Fruit", rarity: "Rare" },
+    "rubber": { name: "Rubber Fruit", rarity: "Rare" },
+    "barrier": { name: "Barrier Fruit", rarity: "Legendary" },
+    "creation": { name: "Creation Fruit", rarity: "Legendary" },
+    "ghost": { name: "Ghost Fruit", rarity: "Rare" },
+    "revive": { name: "Revive Fruit", rarity: "Rare" },
+    "magma": { name: "Magma Fruit", rarity: "Rare" },
+    "quake": { name: "Quake Fruit", rarity: "Legendary" },
+    "buddha": { name: "Buddha Fruit", rarity: "Legendary" },
+    "love": { name: "Love Fruit", rarity: "Legendary" },
+    "spider": { name: "Spider Fruit", rarity: "Legendary" },
+    "sound": { name: "Sound Fruit", rarity: "Legendary" },
+    "phoenix": { name: "Phoenix Fruit", rarity: "Legendary" },
+    "portal": { name: "Portal Fruit", rarity: "Legendary" },
+    "rumble": { name: "Rumble Fruit", rarity: "Legendary" },
+    "lightning": { name: "Lightning Fruit", rarity: "Legendary" },
+    "pain": { name: "Pain Fruit", rarity: "Legendary" },
+    "paw": { name: "Paw Fruit", rarity: "Legendary" },
+    "blizzard": { name: "Blizzard Fruit", rarity: "Legendary" },
+    "gravity": { name: "Gravity Fruit", rarity: "Mythical" },
+    "mammoth": { name: "Mammoth Fruit", rarity: "Mythical" },
+    "trex": { name: "T-Rex Fruit", rarity: "Mythical" },
+    "dough": { name: "Dough Fruit", rarity: "Mythical" },
+    "shadow": { name: "Shadow Fruit", rarity: "Mythical" },
+    "venom": { name: "Venom Fruit", rarity: "Mythical" },
+    "control": { name: "Control Fruit", rarity: "Mythical" },
+    "spirit": { name: "Spirit Fruit", rarity: "Mythical" },
+    "dragon": { name: "Dragon Fruit", rarity: "Mythical" },
+    "leopard": { name: "Leopard Fruit", rarity: "Mythical" },
+    "kitsune": { name: "Kitsune Fruit", rarity: "Mythical" },
+    "gas": { name: "Gas Fruit", rarity: "Mythical" },
+    "yeti": { name: "Yeti Fruit", rarity: "Mythical" },
+    "magnet": { name: "Magnet Fruit", rarity: "Legendary" }
+};
+
+function resolveFruitMeta(rawFruitName, baseUrl) {
+    const clean = String(rawFruitName || "Fruit")
+        .replace(/Fruit/gi, "")
+        .replace(/[-_()]/g, " ")
+        .trim();
+    const key = clean.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const match = FRUIT_CATALOG[key] || { name: `${clean} Fruit`, rarity: "Legendary" };
+
+    let iconUrl = `${baseUrl}/assets/fruitshub_logo_transparent.png`;
+    const localAssetFile = path.join(__dirname, "assets", "fruits", `${key}.png`);
+    if (fs.existsSync(localAssetFile)) {
+        iconUrl = `${baseUrl}/assets/fruits/${key}.png`;
+    } else if (key === "eagle") {
+        iconUrl = "https://bffr.fr/wiki/assets/img/eagle/card-400.webp";
+    } else if (key === "creation") {
+        iconUrl = "https://bffr.fr/wiki/assets/img/creation/card-400.webp";
+    }
+
+    const color = FRUIT_COLORS[match.rarity] || 0xFF2D55;
+    return {
+        name: match.name,
+        rarity: match.rarity,
+        color,
+        iconUrl
+    };
+}
+
+const fruitAlertCooldowns = new Map();
+
+async function sendFruitFindNotification(fruitName, discordUserId, baseUrl) {
+    const channelId = CONFIG.DISCORD.FINDS_CHANNEL_ID;
+    const meta = resolveFruitMeta(fruitName, baseUrl);
+    const authorIcon = `${baseUrl}/assets/fruitshub_logo_transparent.png`;
+
+    const embed = {
+        author: {
+            name: "FruitsHub • Fruit Notifier",
+            icon_url: authorIcon
+        },
+        description: discordUserId
+            ? `⚡ <@${discordUserId}> just discovered a **${meta.name}** using **FruitsHub**!`
+            : `⚡ A **${meta.name}** was just discovered using **FruitsHub**!`,
+        color: meta.color,
+        thumbnail: {
+            url: meta.iconUrl
+        },
+        footer: {
+            text: "FruitsHub • 100% Anonymous"
+        },
+        timestamp: new Date().toISOString()
+    };
+
+    const payload = {
+        content: discordUserId ? `<@${discordUserId}>` : "",
+        embeds: [embed]
+    };
+
+    // 1. Try Discord.js client if ready
+    if (discordClient && discordClient.isReady()) {
+        try {
+            const channel = await discordClient.channels.fetch(channelId);
+            if (channel && channel.isTextBased()) {
+                await channel.send(payload);
+                return true;
+            }
+        } catch (e) {
+            console.warn("[-] discordClient channel send failed, trying REST API fallback:", e.message);
+        }
+    }
+
+    // 2. Direct Discord REST API fallback using Bot Token
+    try {
+        const res = await fetch(`https://discord.com/api/v10/channels/${channelId}/messages`, {
+            method: "POST",
+            headers: {
+                "Authorization": `Bot ${CONFIG.DISCORD.BOT_TOKEN}`,
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(payload)
+        });
+        if (!res.ok) {
+            const errText = await res.text();
+            console.error(`[-] Discord REST API alert failed (${res.status}):`, errText);
+            return false;
+        }
+        return true;
+    } catch (e) {
+        console.error("[-] Network error posting to Discord REST API:", e.message);
+        return false;
+    }
+}
+
+// 9.5 Fruit Finds Notification Webhook Endpoint
+app.post("/api/notify/fruit-find", async (req, res) => {
+    const key = req.headers["x-fruitshub-key"] || (req.body && req.body.key);
+    const rawFruit = req.body && (req.body.fruit || req.body.fruitName);
+    const rawDiscordId = req.body && (req.body.discord_id || req.body.discordId);
+
+    if (!key) {
+        return res.status(401).json({ error: "Missing key" });
+    }
+    if (!rawFruit) {
+        return res.status(400).json({ error: "Missing fruit name" });
+    }
+
+    const keyValidation = await validateUserKey(String(key));
+    if (!keyValidation) {
+        return res.status(401).json({ error: "Invalid or expired FruitsHub key" });
+    }
+
+    // Anti-spam cooldown: 15 seconds per key
+    const now = Date.now();
+    const lastAlert = fruitAlertCooldowns.get(keyValidation.key) || 0;
+    if (now - lastAlert < 15000) {
+        return res.status(200).json({ success: true, throttled: true });
+    }
+    fruitAlertCooldowns.set(keyValidation.key, now);
+
+    // Housekeeping
+    if (fruitAlertCooldowns.size > 2000) {
+        for (const [k, t] of fruitAlertCooldowns.entries()) {
+            if (now - t > 60000) fruitAlertCooldowns.delete(k);
+        }
+    }
+
+    let discordId = null;
+    if (rawDiscordId && /^\d{16,21}$/.test(String(rawDiscordId).trim())) {
+        discordId = String(rawDiscordId).trim();
+    } else if (keyValidation.discord_id && /^\d{16,21}$/.test(String(keyValidation.discord_id).trim())) {
+        discordId = String(keyValidation.discord_id).trim();
+    }
+
+    const baseUrl = getBaseUrl(req);
+    const sent = await sendFruitFindNotification(rawFruit, discordId, baseUrl);
+
+    return res.status(200).json({ success: true, notified: sent });
 });
 
 // ==================== ADMIN CONSOLE WEB GATEWAY & LOCKSCREEN ====================
