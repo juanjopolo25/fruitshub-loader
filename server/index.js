@@ -3108,13 +3108,16 @@ function resolveFruitMeta(rawFruitName, baseUrl) {
     const match = FRUIT_CATALOG[key] || { name: `${clean} Fruit`, rarity: "Legendary" };
 
     let iconUrl = `${baseUrl}/assets/fruitshub_logo_transparent.png`;
-    const localAssetFile = path.join(__dirname, "assets", "fruits", `${key}.png`);
-    if (fs.existsSync(localAssetFile)) {
+    const localPng = path.join(__dirname, "assets", "fruits", `${key}.png`);
+    const localWebp = path.join(__dirname, "assets", "fruits", `${key}.webp`);
+    
+    if (fs.existsSync(localPng)) {
         iconUrl = `${baseUrl}/assets/fruits/${key}.png`;
-    } else if (key === "eagle") {
-        iconUrl = "https://bffr.fr/wiki/assets/img/eagle/card-400.webp";
-    } else if (key === "creation") {
-        iconUrl = "https://bffr.fr/wiki/assets/img/creation/card-400.webp";
+    } else if (fs.existsSync(localWebp)) {
+        iconUrl = `${baseUrl}/assets/fruits/${key}.webp`;
+    } else {
+        const slug = key === "rumble" ? "lightning" : (key === "paw" ? "pain" : (key === "trex" ? "t-rex" : key));
+        iconUrl = `https://bffr.fr/wiki/assets/img/${slug}/card-400.webp`;
     }
 
     const color = FRUIT_COLORS[match.rarity] || 0xFF2D55;
