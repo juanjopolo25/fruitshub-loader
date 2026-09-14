@@ -815,6 +815,15 @@ body {
   background: var(--emerald-400);
   color: #05080e;
 }
+.btn-action-edit {
+  background: rgba(129, 140, 248, 0.12);
+  color: #818cf8;
+  border-color: rgba(129, 140, 248, 0.28);
+}
+.btn-action-edit:hover {
+  background: #818cf8;
+  color: #05080e;
+}
 .btn-action-toggle {
   background: rgba(255, 255, 255, 0.05);
   color: var(--text-secondary);

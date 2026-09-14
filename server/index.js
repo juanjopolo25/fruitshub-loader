@@ -2544,6 +2544,95 @@ app.delete("/api/admin/keys/:key", requireAdminAuth, async (req, res) => {
     }
 });
 
+// 8.9.0 Key Management: Edit & Update Key (Discord ID, Note, Tier, HWID)
+app.post("/api/admin/keys/update", requireAdminAuth, async (req, res) => {
+    try {
+        const { key, discordId, note, tier, hwid } = req.body;
+        if (!key) return res.status(400).json({ error: "Missing key" });
+
+        const rowRes = await db.execute({
+            sql: "SELECT * FROM keys WHERE key = ?",
+            args: [String(key).trim()]
+        });
+
+        if (rowRes.rows.length === 0) {
+            return res.status(404).json({ error: "Key not found" });
+        }
+
+        const existingKey = rowRes.rows[0];
+        let resolvedDiscordId = null;
+        let resolvedDiscordTag = null;
+        const cleanDiscordId = discordId !== undefined ? String(discordId).trim() : null;
+
+        if (cleanDiscordId) {
+            try {
+                if (discordClient && discordClient.isReady()) {
+                    const fetchedUser = await discordClient.users.fetch(cleanDiscordId).catch(() => null);
+                    if (fetchedUser) {
+                        resolvedDiscordId = fetchedUser.id;
+                        resolvedDiscordTag = fetchedUser.discriminator && fetchedUser.discriminator !== "0"
+                            ? `${fetchedUser.username}#${fetchedUser.discriminator}`
+                            : (fetchedUser.global_name || fetchedUser.username);
+                    }
+                }
+
+                if (!resolvedDiscordId && CONFIG.DISCORD.BOT_TOKEN) {
+                    const restRes = await fetch(`https://discord.com/api/v10/users/${cleanDiscordId}`, {
+                        headers: { "Authorization": `Bot ${CONFIG.DISCORD.BOT_TOKEN}` }
+                    });
+                    if (restRes.ok) {
+                        const uData = await restRes.json();
+                        resolvedDiscordId = uData.id;
+                        resolvedDiscordTag = uData.discriminator && uData.discriminator !== "0"
+                            ? `${uData.username}#${uData.discriminator}`
+                            : (uData.global_name || uData.username);
+                    }
+                }
+
+                if (!resolvedDiscordId) {
+                    resolvedDiscordId = cleanDiscordId;
+                    resolvedDiscordTag = `User (${cleanDiscordId})`;
+                }
+            } catch (err) {
+                console.error("[-] Failed resolving Discord user on update:", err);
+                resolvedDiscordId = cleanDiscordId;
+                resolvedDiscordTag = `User (${cleanDiscordId})`;
+            }
+        } else if (cleanDiscordId === "") {
+            // Explicitly cleared
+            resolvedDiscordId = null;
+            resolvedDiscordTag = null;
+        } else {
+            // Undefined in body -> keep existing
+            resolvedDiscordId = existingKey.discord_id;
+            resolvedDiscordTag = existingKey.discord_tag;
+        }
+
+        const updatedNote = note !== undefined ? String(note).trim() : existingKey.note;
+        const updatedTier = tier !== undefined ? String(tier).trim() : existingKey.tier;
+        const updatedHwid = hwid !== undefined ? String(hwid).trim() : existingKey.hwid;
+
+        await db.execute({
+            sql: "UPDATE keys SET discord_id = ?, discord_tag = ?, note = ?, tier = ?, hwid = ? WHERE key = ?",
+            args: [resolvedDiscordId, resolvedDiscordTag, updatedNote, updatedTier, updatedHwid, String(key).trim()]
+        });
+
+        console.log(`[+] Key updated: ${key} -> Discord ID: ${resolvedDiscordId || 'Cleared'} (${resolvedDiscordTag || ''})`);
+        return res.status(200).json({
+            success: true,
+            key: String(key).trim(),
+            discord_id: resolvedDiscordId,
+            discord_tag: resolvedDiscordTag,
+            note: updatedNote,
+            tier: updatedTier,
+            hwid: updatedHwid
+        });
+    } catch (err) {
+        console.error("[-] Update key error:", err);
+        return res.status(500).json({ error: err.message });
+    }
+});
+
 // ==================== BACKGROUND RETENTION & CLEANUP ====================
 // Automatically prunes expired keys older than retentionDays (default 7 days)
 // to maintain database hygiene while preserving grace period for renewals & support.

@@ -23,6 +23,8 @@ const AdminApp = (() => {
     searchDebounce: null
   };
 
+  const currentKeysCache = new Map();
+
   // Color palette for executors
   const EXECUTOR_COLORS = [
     "fill-cyan",
@@ -382,9 +384,13 @@ const AdminApp = (() => {
       document.getElementById("btn-page-next").disabled = pagination.page >= keyState.totalPages;
 
       if (keys.length === 0) {
+        currentKeysCache.clear();
         tbody.innerHTML = `<tr><td colspan="7" class="text-center py-6" style="color: var(--text-tertiary);">No keys found matching the selected filters.</td></tr>`;
         return;
       }
+
+      currentKeysCache.clear();
+      keys.forEach(k => currentKeysCache.set(k.key, k));
 
       let rowsHtml = "";
       keys.forEach(k => {
@@ -466,6 +472,15 @@ const AdminApp = (() => {
                   onclick="AdminApp.openExtendModal('${escapeHtml(k.key)}')"
                 >
                   + Extend
+                </button>
+
+                <!-- Edit -->
+                <button 
+                  class="btn-action btn-action-edit" 
+                  title="Edit Discord user ID, note, tier or device lock"
+                  onclick="AdminApp.openEditModal('${escapeHtml(k.key)}')"
+                >
+                  ✏️ Edit
                 </button>
 
                 <!-- Toggle Active -->
@@ -581,9 +596,25 @@ const AdminApp = (() => {
     modal.classList.remove("hidden");
   }
 
+  function openEditModal(key) {
+    const modal = document.getElementById("modal-edit-key");
+    if (!modal) return;
+
+    const k = currentKeysCache.get(key) || { key };
+    document.getElementById("modal-edit-key-id").value = key;
+    document.getElementById("modal-edit-key-display").textContent = key;
+    document.getElementById("modal-edit-discord").value = k.discord_id || "";
+    document.getElementById("modal-edit-note").value = k.note || "";
+    document.getElementById("modal-edit-tier").value = k.tier || "24h";
+    document.getElementById("modal-edit-hwid").value = k.hwid || "UNSET";
+
+    modal.classList.remove("hidden");
+  }
+
   function closeModals() {
     document.getElementById("modal-create-key")?.classList.add("hidden");
     document.getElementById("modal-extend-key")?.classList.add("hidden");
+    document.getElementById("modal-edit-key")?.classList.add("hidden");
   }
 
   async function handleCreateKeySubmit(e) {
@@ -640,6 +671,39 @@ const AdminApp = (() => {
       loadKeys();
     } catch (err) {
       showToast(`Error extending key: ${err.message}`, "error");
+    }
+  }
+
+  async function handleEditKeySubmit(e) {
+    e.preventDefault();
+    const key = document.getElementById("modal-edit-key-id").value;
+    const discordId = document.getElementById("modal-edit-discord").value.trim();
+    const note = document.getElementById("modal-edit-note").value.trim();
+    const tier = document.getElementById("modal-edit-tier").value;
+    const hwid = document.getElementById("modal-edit-hwid").value.trim();
+    const btn = document.getElementById("btn-submit-edit");
+
+    btn.disabled = true;
+
+    try {
+      await apiRequest("/api/admin/keys/update", {
+        method: "POST",
+        body: JSON.stringify({
+          key,
+          discordId,
+          note,
+          tier,
+          hwid
+        })
+      });
+
+      closeModals();
+      showToast("Key details updated successfully!", "success");
+      loadKeys();
+    } catch (err) {
+      showToast(`Error updating key: ${err.message}`, "error");
+    } finally {
+      btn.disabled = false;
     }
   }
 
@@ -941,6 +1005,7 @@ const AdminApp = (() => {
     // Modals
     document.getElementById("form-create-key")?.addEventListener("submit", handleCreateKeySubmit);
     document.getElementById("form-extend-key")?.addEventListener("submit", handleExtendKeySubmit);
+    document.getElementById("form-edit-key")?.addEventListener("submit", handleEditKeySubmit);
 
     // Executor time range buttons
     document.querySelectorAll(".time-filter-pills .pill-btn").forEach(btn => {
@@ -974,6 +1039,7 @@ const AdminApp = (() => {
     deleteKey,
     openCreateModal,
     openExtendModal,
+    openEditModal,
     closeModals,
     copyText,
     copyLoaderWithKey
